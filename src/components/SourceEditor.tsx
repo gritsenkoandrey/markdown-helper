@@ -17,6 +17,8 @@ export interface SourceEditorHandle {
 
 interface Props {
   initialText: string;
+  /** Поставить курсор в конец (новый документ — сразу писать под заголовком). */
+  cursorAtEnd?: boolean;
   onChange: (text: string) => void;
 }
 
@@ -74,7 +76,7 @@ const highlightStyle = HighlightStyle.define([
 ]);
 
 export const SourceEditor = forwardRef<SourceEditorHandle, Props>(function SourceEditor(
-  { initialText, onChange },
+  { initialText, cursorAtEnd, onChange },
   ref,
 ) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -88,6 +90,7 @@ export const SourceEditor = forwardRef<SourceEditorHandle, Props>(function Sourc
       parent: hostRef.current!,
       state: EditorState.create({
         doc: initialText,
+        selection: cursorAtEnd ? { anchor: initialText.length } : undefined,
         extensions: [
           history(),
           drawSelection(),

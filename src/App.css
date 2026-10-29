@@ -709,3 +709,99 @@ button:disabled {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+/* Работа с файлами в дереве */
+
+.panel-body.files {
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-body[hidden] {
+  display: none;
+}
+
+.tree-area {
+  flex: 1;
+}
+
+.tree-input {
+  padding-top: 2px;
+  padding-bottom: 2px;
+  padding-right: 8px;
+}
+
+.tree-input input {
+  width: 100%;
+  padding: 3px 6px;
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  outline: none;
+}
+
+.tree-input-error {
+  margin-top: 3px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--error-text);
+  background: var(--error-bg);
+}
+
+.context-menu {
+  position: fixed;
+  z-index: 20;
+  min-width: 180px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-panel);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+.context-menu-item {
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
+  border-radius: 4px;
+  text-align: left;
+  font-size: 13.5px;
+}
+
+.context-menu-item:hover {
+  background: var(--bg-hover);
+}
+
+.context-menu-item.danger {
+  color: var(--error-text);
+}
+
+.context-menu-separator {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--border);
+}
+
+.drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 3px dashed var(--accent);
+}
+
+.drop-overlay div {
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-size: 15px;
+  background: var(--bg-panel);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}

@@ -10,13 +10,15 @@ import {
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open } from "@tauri-apps/plugin-dialog";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import type { Heading, TreeNode } from "./types";
 import { extractHeadings, renderMarkdown, type RenderResult } from "./markdown";
 import { parseFile, serializeFile, type FileFormat } from "./fileFormat";
 import { basename, dirname, isExternalUrl, relativePath, resolvePath } from "./paths";
-import { FileTree } from "./components/FileTree";
+import { FileTree, type TreeActions, type TreeEdit } from "./components/FileTree";
+import { ContextMenu, type MenuItem } from "./components/ContextMenu";
 import { Outline } from "./components/Outline";
 import { FindBar } from "./components/FindBar";
 import { SearchPanel } from "./components/SearchPanel";
@@ -65,6 +67,13 @@ function saveLastRoot(path: string) {
   }
 }
 
+/** Путь равен base или лежит внутри него (без учёта регистра, как в Windows). */
+function isSameOrInside(path: string, base: string): boolean {
+  const p = path.toLowerCase();
+  const b = base.toLowerCase().replace(/[\\/]+$/, "");
+  return p === b || p.startsWith(b + "\\");
+}
+
 function collectFiles(node: TreeNode, out: string[] = []): string[] {
   for (const child of node.children) {
     if (child.is_dir) collectFiles(child, out);
@@ -86,6 +95,7 @@ export default function App() {
   const [dirty, setDirty] = useState(false);
   const [editorText, setEditorText] = useState("");
   const [editorKey, setEditorKey] = useState(0);
+  const [editorCursorAtEnd, setEditorCursorAtEnd] = useState(false);
   const [dialog, setDialog] = useState<(DialogRequest & { resolve: (value: string) => void }) | null>(null);
 
   const [sidebarMode, setSidebarMode] = useState<SidebarMode>("files");
@@ -96,6 +106,9 @@ export default function App() {
   const [findJumpKey, setFindJumpKey] = useState(0);
   const [quickOpen, setQuickOpen] = useState(false);
   const [, setHistoryVersion] = useState(0);
+  const [treeEdit, setTreeEdit] = useState<TreeEdit | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; items: MenuItem[] } | null>(null);
+  const [dragging, setDragging] = useState(false);
 
   const contentRef = useRef<HTMLDivElement>(null);
   const articleRef = useRef<HTMLElement>(null);
@@ -267,10 +280,11 @@ export default function App() {
     [confirmLeave, openFile],
   );
 
-  const enterEdit = useCallback(() => {
+  const enterEdit = useCallback((cursorAtEnd = false) => {
     if (!docRef.current || modeRef.current === "edit") return;
     viewScrollRef.current = contentRef.current?.scrollTop ?? 0;
     setEditorText(textRef.current);
+    setEditorCursorAtEnd(cursorAtEnd);
     setEditorKey((k) => k + 1);
     setFindOpen(false);
     switchMode("edit");
@@ -350,6 +364,157 @@ export default function App() {
     }
   }, [applyRender, askDialog, setDirtyState]);
 
+  /** Закрывает документ (без вопросов про правки — это делается раньше). */
+  const resetDocument = useCallback(() => {
+    requestRef.current++;
+    docRef.current = null;
+    textRef.current = "";
+    setDirtyState(false);
+    switchMode("view");
+    setCurrentFile(null);
+    setHtml("");
+    setHeadings([]);
+    setFindOpen(false);
+  }, [setDirtyState, switchMode]);
+
+  const resetHistory = useCallback(() => {
+    historyRef.current = { stack: [], index: -1 };
+    setHistoryVersion((v) => v + 1);
+  }, []);
+
+  /** Открывает путь снаружи: повторный запуск, перетаскивание в окно, аргумент при старте. */
+  const openExternalPath = useCallback(
+    async (path: string) => {
+      const kind = await invoke<"dir" | "markdown" | "other">("path_kind", { path });
+      if (kind === "other") {
+        setError(`Открыть можно папку или markdown-файл, а не «${basename(path)}»`);
+        return;
+      }
+      const root = rootRef.current;
+      if (root && isSameOrInside(path, root)) {
+        // Уже открытая папка или файл внутри неё — обычный переход.
+        if (kind === "markdown") await navigateTo(path);
+        else setSidebarMode("files");
+        return;
+      }
+      if (!(await confirmLeave())) return;
+      resetDocument();
+      resetHistory();
+      if (kind === "dir") {
+        await loadFolder(path);
+      } else {
+        await loadFolder(dirname(path));
+        await openFile(path);
+      }
+    },
+    [confirmLeave, loadFolder, navigateTo, openFile, resetDocument, resetHistory],
+  );
+
+  /** После переименования поправляем пути открытого документа и истории. */
+  const remapPaths = useCallback((oldPath: string, newPath: string) => {
+    const remap = (p: string) => (isSameOrInside(p, oldPath) ? newPath + p.slice(oldPath.length) : p);
+    const doc = docRef.current;
+    if (doc && isSameOrInside(doc.path, oldPath)) {
+      doc.path = remap(doc.path);
+      setCurrentFile(doc.path);
+    }
+    historyRef.current.stack = historyRef.current.stack.map(remap);
+    setHistoryVersion((v) => v + 1);
+  }, []);
+
+  const submitTreeEdit = useCallback(
+    async (value: string): Promise<string | null> => {
+      const edit = treeEdit;
+      if (!edit) return null;
+      try {
+        if (edit.kind === "new-file") {
+          const path = await invoke<string>("create_file", { dir: edit.dir, name: value });
+          setTreeEdit(null);
+          await refreshTree();
+          if (await confirmLeave()) {
+            await openFile(path);
+            enterEdit(true);
+          }
+        } else if (edit.kind === "new-folder") {
+          await invoke<string>("create_folder", { dir: edit.dir, name: value });
+          setTreeEdit(null);
+          await refreshTree();
+        } else if (edit.kind === "rename") {
+          const newPath = await invoke<string>("rename_path", { path: edit.path, newName: value });
+          setTreeEdit(null);
+          remapPaths(edit.path, newPath);
+          await refreshTree();
+        }
+        return null;
+      } catch (e) {
+        return String(e);
+      }
+    },
+    [confirmLeave, enterEdit, openFile, refreshTree, remapPaths, treeEdit],
+  );
+
+  const deleteNode = useCallback(
+    async (node: TreeNode) => {
+      const choice = await askDialog({
+        title: "Удалить в Корзину?",
+        message: node.is_dir
+          ? `Папка «${node.name}» со всем содержимым будет перемещена в Корзину.`
+          : `Файл «${node.name}» будет перемещён в Корзину.`,
+        buttons: [
+          { label: "Удалить", value: "delete" },
+          { label: "Отмена", value: "cancel", primary: true },
+        ],
+        cancelValue: "cancel",
+      });
+      if (choice !== "delete") return;
+      try {
+        await invoke("delete_path", { path: node.path });
+      } catch (e) {
+        setError(String(e));
+        return;
+      }
+      if (docRef.current && isSameOrInside(docRef.current.path, node.path)) resetDocument();
+      const history = historyRef.current;
+      history.stack = history.stack.filter((p) => !isSameOrInside(p, node.path));
+      history.index = Math.min(history.index, history.stack.length - 1);
+      setHistoryVersion((v) => v + 1);
+      await refreshTree();
+    },
+    [askDialog, refreshTree, resetDocument],
+  );
+
+  const startCreate = useCallback((kind: "new-file" | "new-folder", dir: string) => {
+    setSidebarMode("files");
+    setTreeEdit({ kind, dir });
+  }, []);
+
+  const handleTreeContextMenu = useCallback(
+    (e: ReactMouseEvent, node: TreeNode | null) => {
+      e.preventDefault();
+      const root = rootRef.current;
+      if (!root) return;
+      const dir = node ? (node.is_dir ? node.path : null) : root;
+      const items: MenuItem[] = [];
+      if (dir) {
+        items.push(
+          { label: "Новый документ", onSelect: () => startCreate("new-file", dir) },
+          { label: "Новая папка", onSelect: () => startCreate("new-folder", dir) },
+        );
+      }
+      if (node) {
+        if (items.length) items.push("separator");
+        items.push(
+          { label: "Переименовать", onSelect: () => setTreeEdit({ kind: "rename", path: node.path, name: node.name }) },
+          { label: "Удалить в Корзину", danger: true, onSelect: () => deleteNode(node) },
+        );
+      }
+      setContextMenu({ x: e.clientX, y: e.clientY, items });
+    },
+    [deleteNode, startCreate],
+  );
+
+  const closeContextMenu = useCallback(() => setContextMenu(null), []);
+
   // Прокрутка после того, как новый документ попал в DOM.
   useLayoutEffect(() => {
     const container = contentRef.current;
@@ -364,19 +529,46 @@ export default function App() {
     }
   }, [renderId]);
 
-  // При запуске: файл из командной строки или последняя открытая папка.
+  // При запуске: путь из командной строки или последняя открытая папка.
   useEffect(() => {
     (async () => {
-      const file = await invoke<string | null>("initial_file");
-      if (file) {
-        await loadFolder(dirname(file));
-        await openFile(file);
+      const path = await invoke<string | null>("initial_path");
+      if (path) {
+        await openExternalPath(path);
         return;
       }
       const last = loadLastRoot();
       if (last) await loadFolder(last);
     })();
-  }, [loadFolder, openFile]);
+    // Только при старте.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Повторный запуск приложения (двойной клик по другому .md) присылает путь сюда.
+  useEffect(() => {
+    const unlisten = listen<string>("open-path", (event) => openExternalPath(event.payload));
+    return () => {
+      unlisten.then((stop) => stop());
+    };
+  }, [openExternalPath]);
+
+  // Перетаскивание файлов и папок из проводника в окно.
+  useEffect(() => {
+    const unlisten = getCurrentWebview().onDragDropEvent((event) => {
+      const payload = event.payload;
+      if (payload.type === "enter" || payload.type === "over") {
+        setDragging(true);
+      } else if (payload.type === "leave") {
+        setDragging(false);
+      } else if (payload.type === "drop") {
+        setDragging(false);
+        if (payload.paths[0]) openExternalPath(payload.paths[0]);
+      }
+    });
+    return () => {
+      unlisten.then((stop) => stop());
+    };
+  }, [openExternalPath]);
 
   // Изменения на диске: обновляем дерево и, если поменялся открытый файл, сам документ.
   useEffect(() => {
@@ -452,6 +644,10 @@ export default function App() {
   useEffect(() => {
     const name = currentFile ? `${dirty ? "● " : ""}${basename(currentFile)} — ` : "";
     document.title = name + "MD Reader";
+    // Заголовок окна в панели задач Tauri сам не обновляет.
+    getCurrentWindow()
+      .setTitle(document.title)
+      .catch(() => {});
   }, [currentFile, dirty]);
 
   const quickOpenItems = useMemo<QuickOpenItem[]>(
@@ -463,17 +659,9 @@ export default function App() {
     if (!(await confirmLeave())) return;
     const selected = await open({ directory: true, multiple: false });
     if (typeof selected === "string") {
-      requestRef.current++;
-      docRef.current = null;
-      textRef.current = "";
-      historyRef.current = { stack: [], index: -1 };
-      setHistoryVersion((v) => v + 1);
-      setDirtyState(false);
-      switchMode("view");
-      setCurrentFile(null);
-      setHtml("");
-      setHeadings([]);
-      setFindOpen(false);
+      resetDocument();
+      resetHistory();
+      setTreeEdit(null);
       await loadFolder(selected);
     }
   };
@@ -516,6 +704,15 @@ export default function App() {
     }
   };
 
+  const treeActions: TreeActions = {
+    currentFile,
+    edit: treeEdit,
+    onOpen: (path) => navigateTo(path),
+    onEditSubmit: submitTreeEdit,
+    onEditCancel: () => setTreeEdit(null),
+    onContextMenu: handleTreeContextMenu,
+  };
+
   const history = historyRef.current;
   const editing = mode === "edit";
 
@@ -538,6 +735,15 @@ export default function App() {
             Поиск
           </button>
           <span className="spacer" />
+          {root && (
+            <button
+              className="icon-button"
+              onClick={() => startCreate("new-file", root)}
+              title="Новый документ (правый клик по папке — создать внутри неё)"
+            >
+              +
+            </button>
+          )}
           <button className="icon-button" onClick={pickFolder} title="Открыть папку">
             📂
           </button>
@@ -548,14 +754,14 @@ export default function App() {
           )}
         </div>
 
-        <div className="panel-body" hidden={sidebarMode !== "files"}>
+        <div className="panel-body files" hidden={sidebarMode !== "files"}>
           {root && (
             <div className="root-name" title={root}>
               {basename(root)}
             </div>
           )}
           {tree ? (
-            <FileTree key={root} root={tree} currentFile={currentFile} onOpen={(p) => navigateTo(p)} />
+            <FileTree key={root} root={tree} actions={treeActions} />
           ) : (
             <p className="muted">{root ? "В папке нет .md файлов" : "Откройте папку с markdown-файлами"}</p>
           )}
@@ -640,7 +846,13 @@ export default function App() {
         )}
 
         {editing && (
-          <SourceEditor key={editorKey} ref={editorRef} initialText={editorText} onChange={handleEditorChange} />
+          <SourceEditor
+            key={editorKey}
+            ref={editorRef}
+            initialText={editorText}
+            cursorAtEnd={editorCursorAtEnd}
+            onChange={handleEditorChange}
+          />
         )}
 
         <div className="content" ref={contentRef} hidden={editing}>
@@ -692,6 +904,16 @@ export default function App() {
           }}
           onClose={() => setQuickOpen(false)}
         />
+      )}
+
+      {contextMenu && (
+        <ContextMenu x={contextMenu.x} y={contextMenu.y} items={contextMenu.items} onClose={closeContextMenu} />
+      )}
+
+      {dragging && (
+        <div className="drop-overlay">
+          <div>Отпустите, чтобы открыть папку или .md файл</div>
+        </div>
       )}
 
       {dialog && <ConfirmDialog request={dialog} onResult={closeDialog} />}
