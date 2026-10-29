@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { relativePath } from "../paths";
+import { t, tn } from "../i18n";
 
 interface SearchMatch {
   line: number;
@@ -19,15 +20,6 @@ interface Props {
 }
 
 const DEBOUNCE_MS = 250;
-
-/** Русское склонение: plural(5, ["файл", "файла", "файлов"]). */
-function plural(n: number, [one, few, many]: [string, string, string]): string {
-  const mod10 = n % 10;
-  const mod100 = n % 100;
-  if (mod10 === 1 && mod100 !== 11) return one;
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
-  return many;
-}
 
 /** Разбивает строку так, чтобы найденный фрагмент можно было выделить. */
 function highlightParts(text: string, query: string) {
@@ -87,14 +79,17 @@ export function SearchPanel({ root, focusKey, onOpenMatch }: Props) {
         className="search-input"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="Поиск по папке"
+        placeholder={t("search.placeholder")}
         spellCheck={false}
       />
       {trimmed && !searching && (
         <p className="muted">
           {total
-            ? `${total} ${plural(total, ["совпадение", "совпадения", "совпадений"])} в ${results.length} ${plural(results.length, ["файле", "файлах", "файлах"])}`
-            : "Ничего не найдено"}
+            ? t("search.summary", {
+                matches: tn("search.matches", total),
+                files: tn("search.files", results.length),
+              })
+            : t("search.nothing")}
         </p>
       )}
       <ul className="search-results">

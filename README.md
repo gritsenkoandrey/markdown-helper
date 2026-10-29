@@ -1,155 +1,173 @@
 # MD Reader
 
-Быстрый просмотрщик и редактор markdown-файлов для Windows. Открываете папку и читаете документы с деревом файлов, оглавлением и поиском. Если нужно что-то поправить, переключаетесь в редактор.
+**English** · [Русский](README.ru.md)
 
-Сделан на [Tauri 2](https://tauri.app), React и TypeScript. Установщик весит около 4 МБ.
+A fast markdown viewer and editor for Windows. Open a folder and read your documents with a file tree, table of contents and search. Switch to the editor when you need to fix something.
 
-## Возможности
+Built with [Tauri 2](https://tauri.app), React and TypeScript. The installer is about 4 MB.
 
-- **Дерево папки:** показываются только `.md` и `.markdown`, служебные папки (`.git`, `node_modules` и т.п.) скрыты.
-- **Отрисовка GitHub-flavored markdown:** таблицы, списки, цитаты, картинки по относительным путям.
-- **Подсветка кода** в блоках через [Shiki], для светлой и тёмной темы.
-- **Оглавление** по заголовкам, с подсветкой текущего раздела.
-- **Ссылки:** на другие `.md` (включая `файл.md#раздел`) открываются внутри приложения, внешние — в браузере.
-- **Поиск** по документу и по всей папке, быстрый переход к файлу.
-- **История** переходов назад и вперёд.
-- **Автообновление:** если файл изменили в другой программе, документ и дерево обновятся сами.
-- **Редактирование** в [CodeMirror 6]:
-  - сохраняется исходный формат файла (CRLF/LF, BOM);
-  - запись атомарная;
-  - есть защита от потери несохранённых правок.
-- **Работа с файлами:** создание документов и папок, переименование, удаление в Корзину.
-- **Один экземпляр:** двойной клик по `.md`, когда приложение уже открыто, открывает файл в существующем окне.
-- **Drag & drop** папки или `.md` файла в окно.
-- Светлая и тёмная тема по настройке Windows.
+## Features
+
+- **Folder tree:** shows only `.md` and `.markdown` files and hides service folders (`.git`, `node_modules`, etc.).
+- **GitHub-flavored markdown:** tables, lists, quotes, images with relative paths.
+- **Code highlighting** in code blocks via [Shiki], for both light and dark themes.
+- **Table of contents** built from headings, with the current section highlighted.
+- **Links:** links to other `.md` files (including `file.md#section`) open inside the app; external links open in the browser.
+- **Search** in the document and across the whole folder, plus quick file switching.
+- **Back / forward** navigation history.
+- **Live reload:** if a file is changed by another program, the document and tree update automatically.
+- **Editing** with [CodeMirror 6]:
+  - keeps the original file format (CRLF/LF, BOM);
+  - writes files atomically;
+  - protects unsaved changes.
+- **File management:** create documents and folders, rename, move to the Recycle Bin.
+- **Favorite folders** above the tree for quick switching between projects.
+- **Single instance:** double-clicking a `.md` file while the app is open shows it in the existing window.
+- **Drag & drop** a folder or `.md` file onto the window.
+- Light and dark theme that follows Windows settings.
+- **English and Russian interface:** EN / RU switch in the table of contents header.
 
 [Shiki]: https://shiki.style
 [CodeMirror 6]: https://codemirror.net
 
-## Горячие клавиши
+## Keyboard shortcuts
 
-| Клавиши | Действие |
+| Keys | Action |
 |---|---|
-| `Ctrl+P` | Перейти к файлу |
-| `Ctrl+Shift+F` | Поиск по папке |
-| `Ctrl+F` | Поиск в документе (в редакторе — поиск и замена) |
-| `Ctrl+E` | Переключить просмотр / редактирование |
-| `Ctrl+S` | Сохранить |
-| `Alt+←` / `Alt+→` | Назад / вперёд (в просмотре; также боковые кнопки мыши) |
-| `Enter` / `Shift+Enter` | Следующее / предыдущее совпадение в поиске по документу |
-| `Esc` | Закрыть поиск, меню или диалог |
+| `Ctrl+P` | Go to file |
+| `Ctrl+Shift+F` | Search in folder |
+| `Ctrl+F` | Find in document (find and replace in the editor) |
+| `Ctrl+E` | Switch between view and edit |
+| `Ctrl+S` | Save |
+| `Alt+←` / `Alt+→` | Back / forward (in view mode; side mouse buttons work too) |
+| `Enter` / `Shift+Enter` | Next / previous match when finding in a document |
+| `Esc` | Close search, a menu or a dialog |
 
-Правый клик в дереве открывает меню: новый документ, новая папка, переименовать, удалить в Корзину.
+Right-click in the tree for a menu: new document, new folder, add to favorites, rename, move to the Recycle Bin.
 
-## Требования для разработки
+Favorite folders are listed above the tree; click one to open it. The star next to the current folder's name adds it to favorites or removes it. Clicking the name itself collapses and expands the tree.
+
+## Development requirements
 
 - [Node.js](https://nodejs.org) LTS
 - [Rust](https://rustup.rs) (stable)
-- Visual Studio Build Tools с компонентом «Desktop development with C++»
-- WebView2: уже есть в Windows 11 и обновлённой Windows 10
+- Visual Studio Build Tools with the "Desktop development with C++" workload
+- WebView2 (already included in Windows 11 and up-to-date Windows 10)
 
-Подробнее в [документации Tauri](https://tauri.app/start/prerequisites/).
+See the [Tauri prerequisites](https://tauri.app/start/prerequisites/) for details.
 
-Один раз установите зависимости:
+Install dependencies once:
 
 ```bash
 npm install
 ```
 
-## Запуск для отладки
+## Running in development
 
 ```bash
 npm run tauri dev
 ```
 
-- Откроется окно приложения.
-- Изменения в интерфейсе (`src/`) подхватываются на лету.
-- Изменения в Rust (`src-tauri/`) пересобирают и перезапускают приложение автоматически.
-- Первый запуск дольше из-за компиляции Rust-зависимостей.
+- The app window opens.
+- Interface changes (`src/`) are applied on the fly.
+- Rust changes (`src-tauri/`) rebuild and restart the app automatically.
+- The first run takes longer because Rust dependencies are compiled.
 
-**Инструменты разработчика WebView** (консоль, инспектор элементов) открываются правым кликом по документу → «Inspect». Это работает только в режиме отладки, в собранной версии их нет.
+**WebView developer tools** (console, element inspector): right-click the document → "Inspect". Only available in development; release builds don't include them.
 
-**Порт 1420.** Vite работает на этом порту. Если запуск падает с ошибкой `Port 1420 is already in use`, значит, остался процесс от прошлого запуска. Завершите его:
+**Port 1420.** Vite runs on this port. If startup fails with `Port 1420 is already in use`, a process from a previous run is still alive. Stop it:
 
 ```bash
 powershell -c 'Get-NetTCPConnection -LocalPort 1420 -State Listen | ForEach-Object { Stop-Process -Id $_.OwningProcess }'
 ```
 
-**Только интерфейс.** `npm run dev` запускает интерфейс в браузере без Rust-части. Команды Tauri (чтение файлов и т.п.) там работать не будут.
+**Interface only.** `npm run dev` runs the interface in a browser without the Rust side. Tauri commands (reading files, etc.) won't work there.
 
-**Проверка Rust без запуска:**
+**Check Rust without running:**
 
 ```bash
 cd src-tauri && cargo check
 ```
 
-**Проверка типов TypeScript:**
+**Check TypeScript types:**
 
 ```bash
 npx tsc --noEmit
 ```
 
-**Один экземпляр в отладке.** Пока открыт `npm run tauri dev`, установленная версия MD Reader не откроет своё окно. Двойной клик по `.md` отправит файл в окно разработки: обе версии считаются одним приложением. Перед обычным использованием закройте окно разработки.
+**Single instance during development.** While `npm run tauri dev` is running, the installed MD Reader won't open its own window. Double-clicking a `.md` file sends it to the development window, because both count as the same app. Close the development window before regular use.
 
-## Сборка
+## Building
 
 ```bash
 npm run tauri build
 ```
 
-Первая сборка занимает 5–10 минут: Rust собирается с полной оптимизацией. Результат:
+The first build takes 5–10 minutes because Rust is compiled with full optimization. Output:
 
-| Файл | Что это |
+| File | What it is |
 |---|---|
-| `src-tauri/target/release/bundle/nsis/MD Reader_<версия>_x64-setup.exe` | Установщик |
-| `src-tauri/target/release/md-reader.exe` | Сама программа, работает без установки |
+| `src-tauri/target/release/bundle/nsis/MD Reader_<version>_x64-setup.exe` | Installer |
+| `src-tauri/target/release/md-reader.exe` | The app itself, runs without installation |
 
-`md-reader.exe` самодостаточен: интерфейс встроен внутрь, отдельные файлы не нужны, только WebView2. Его можно скопировать куда угодно и запускать оттуда. Привязки к `.md` и ярлыка в «Пуске» у такого запуска не будет.
+`md-reader.exe` is self-contained: the interface is embedded and only WebView2 is required. You can copy it anywhere and run it from there. It won't have the `.md` file association or a Start menu shortcut, though.
 
-Версия приложения задаётся в `src-tauri/tauri.conf.json` (поле `version`) и в `package.json`.
+The app version is set in `src-tauri/tauri.conf.json` (`version`) and in `package.json`.
 
-## Установка
+## Installation
 
-Запустите `MD Reader_<версия>_x64-setup.exe`. Установщик:
+Run `MD Reader_<version>_x64-setup.exe`. The installer:
 
-- ставит приложение в профиль пользователя (права администратора не нужны);
-- добавляет ярлык в «Пуск» и пункт удаления в «Приложения» Windows;
-- привязывает `.md` и `.markdown` к MD Reader.
+- installs the app into the user profile (no administrator rights needed);
+- adds a Start menu shortcut and an entry in Windows "Apps" for uninstalling;
+- associates `.md` and `.markdown` with MD Reader;
+- uses English or Russian depending on the Windows language.
 
-Если Windows всё равно открывает `.md` другой программой: правый клик по файлу → «Открыть с помощью» → «Выбрать другое приложение» → MD Reader → «Всегда».
+If Windows still opens `.md` files in another program: right-click a file → "Open with" → "Choose another app" → MD Reader → "Always".
 
-Приложение не подписано, поэтому Windows может показать предупреждение SmartScreen: «Подробнее» → «Выполнить в любом случае».
+The app isn't code-signed, so Windows SmartScreen may show a warning: "More info" → "Run anyway".
 
-Для обновления соберите новую версию и запустите установщик поверх старой.
+To update, build a new version and run its installer over the old one.
 
-**Настройки** (последняя открытая папка) хранятся в `%LOCALAPPDATA%\com.local.mdreader` и переживают переустановку.
+**Settings** (last opened folder, favorite folders, interface language) are stored in `%LOCALAPPDATA%\com.local.mdreader` and survive reinstallation.
 
-## Структура проекта
+## Project structure
 
 ```
-src/                      интерфейс (React + TypeScript)
-  App.tsx                 главное окно: состояние, переходы, режимы, горячие клавиши
-  markdown.ts             отрисовка markdown, заголовки для оглавления
-  highlight.ts            подсветка кода (Shiki)
-  fileFormat.ts           сохранение CRLF/LF и BOM при редактировании
-  paths.ts                работа с путями Windows
+src/                      interface (React + TypeScript)
+  App.tsx                 main window: state, navigation, modes, shortcuts
+  markdown.ts             markdown rendering, headings for the table of contents
+  highlight.ts            code highlighting (Shiki)
+  fileFormat.ts           keeps CRLF/LF and BOM when editing
+  paths.ts                Windows path helpers
+  folders.ts              favorite folders
+  i18n.ts                 interface translations (en, ru)
   components/
-    FileTree.tsx          дерево файлов, ввод имени при создании/переименовании
-    Outline.tsx           оглавление
-    SourceEditor.tsx      редактор (CodeMirror 6)
-    FindBar.tsx           поиск в документе
-    SearchPanel.tsx       поиск по папке
-    QuickOpen.tsx         быстрый переход к файлу (Ctrl+P)
-    ContextMenu.tsx       контекстное меню дерева
-    ConfirmDialog.tsx     диалоги подтверждения
-src-tauri/                Rust-часть (Tauri)
-  src/lib.rs              команды: дерево, чтение/запись, поиск, слежение за папкой,
-                          создание/переименование/удаление, один экземпляр
-  tauri.conf.json         настройки окна, установщика и привязки к .md
-  capabilities/           разрешения для интерфейса
-samples/                  тестовые документы
+    FileTree.tsx          file tree, name input for create/rename
+    Outline.tsx           table of contents
+    SourceEditor.tsx      editor (CodeMirror 6)
+    FindBar.tsx           find in document
+    SearchPanel.tsx       search in folder
+    QuickOpen.tsx         go to file (Ctrl+P)
+    ContextMenu.tsx       tree context menu
+    FavoritesList.tsx     favorite folders list
+    ConfirmDialog.tsx     confirmation dialogs
+src-tauri/                Rust side (Tauri)
+  src/lib.rs              commands: tree, read/write, search, folder watching,
+                          create/rename/delete, single instance
+  tauri.conf.json         window, installer and .md association settings
+  capabilities/           permissions for the interface
+samples/                  sample documents
 ```
 
-## Лицензия
+## Translations
+
+All interface strings live in `src/i18n.ts`. English is the primary language: if a string is missing in another language, the English one is shown.
+
+- **New string:** add the key to the `en` dictionary, then to `ru`. TypeScript won't compile until `ru` has every key from `en`. Use `t("key")` in code, and `tn("key", n)` for strings with a number (plural forms are given as an array).
+- **Rust errors** arrive as codes (`AppError` in `src-tauri/src/lib.rs`); their text comes from the `error.<code>` keys.
+- **New language:** add a dictionary, add its code to the `Lang` type and the `LANGUAGES` list, and add its plural rule to `pluralIndex`.
+
+## License
 
 [MIT](LICENSE)

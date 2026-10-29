@@ -24,6 +24,40 @@ struct WatcherState(Mutex<Option<Debouncer<RecommendedWatcher>>>);
 #[derive(Default)]
 struct RootState(Mutex<Option<PathBuf>>);
 
+/// Ошибка для интерфейса: код вместо готовой фразы, текст на нужном языке собирает фронтенд
+/// (ключи `error.<code>` в src/i18n.ts). `arg` — имя или путь, `detail` — текст ошибки системы.
+#[derive(Serialize)]
+struct AppError {
+    code: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    arg: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    detail: Option<String>,
+}
+
+impl AppError {
+    fn new(code: &'static str) -> Self {
+        Self { code, arg: None, detail: None }
+    }
+
+    fn arg(mut self, arg: impl Into<String>) -> Self {
+        self.arg = Some(arg.into());
+        self
+    }
+
+    fn detail(mut self, detail: impl ToString) -> Self {
+        self.detail = Some(detail.to_string());
+        self
+    }
+
+    /// Непредвиденная внутренняя ошибка: показываем как есть.
+    fn internal(detail: impl ToString) -> Self {
+        Self::new("internal").detail(detail)
+    }
+}
+
+type AppResult<T> = Result<T, AppError>;
+
 fn is_skipped_dir(name: &str) -> bool {
     name.starts_with('.') || IGNORED_DIRS.contains(&name)
 }
@@ -95,37 +129,38 @@ fn build_tree(dir: &Path, is_root: bool) -> Option<TreeNode> {
 }
 
 #[tauri::command]
-async fn read_tree(root: String) -> Result<Option<TreeNode>, String> {
+async fn read_tree(root: String) -> AppResult<Option<TreeNode>> {
     let root_path = Path::new(&root);
     if !root_path.is_dir() {
-        return Err(format!("Папка не найдена: {root}"));
+        return Err(AppError::new("folder_not_found").arg(root));
     }
     Ok(build_tree(root_path, true))
 }
 
 #[tauri::command]
-async fn read_file(path: String) -> Result<String, String> {
-    fs::read_to_string(&path).map_err(|e| format!("Не удалось прочитать {path}: {e}"))
+async fn read_file(path: String) -> AppResult<String> {
+    fs::read_to_string(&path).map_err(|e| AppError::new("read_failed").arg(&path).detail(e))
 }
 
 /// Атомарная запись: пишем во временный файл рядом и подменяем им оригинал,
 /// чтобы сбой посреди записи не оставил документ обрезанным.
 #[tauri::command]
-async fn write_file(path: String, content: String) -> Result<(), String> {
+async fn write_file(path: String, content: String) -> AppResult<()> {
     let target = PathBuf::from(&path);
     if !is_markdown(&target) {
-        return Err(format!("Можно сохранять только markdown-файлы: {path}"));
+        return Err(AppError::new("not_markdown").arg(path));
     }
     let (Some(dir), Some(name)) = (target.parent(), target.file_name()) else {
-        return Err(format!("Некорректный путь: {path}"));
+        return Err(AppError::new("invalid_path").arg(path));
     };
     // Имя с точкой в начале: наблюдатель за папкой такие файлы пропускает.
     let tmp = dir.join(format!(".{}.md-reader-tmp", name.to_string_lossy()));
+    let save_failed = |e: std::io::Error| AppError::new("save_failed").arg(&path).detail(e);
 
-    fs::write(&tmp, content.as_bytes()).map_err(|e| format!("Не удалось сохранить {path}: {e}"))?;
+    fs::write(&tmp, content.as_bytes()).map_err(save_failed)?;
     fs::rename(&tmp, &target).map_err(|e| {
         let _ = fs::remove_file(&tmp);
-        format!("Не удалось сохранить {path}: {e}")
+        save_failed(e)
     })
 }
 
@@ -190,13 +225,13 @@ fn search(root: &Path, query: &str) -> Vec<SearchResult> {
 }
 
 #[tauri::command]
-async fn search_folder(root: String, query: String) -> Result<Vec<SearchResult>, String> {
+async fn search_folder(root: String, query: String) -> AppResult<Vec<SearchResult>> {
     if query.trim().is_empty() {
         return Ok(Vec::new());
     }
     tauri::async_runtime::spawn_blocking(move || search(Path::new(&root), &query))
         .await
-        .map_err(|e| e.to_string())
+        .map_err(AppError::internal)
 }
 
 /// Следит за папкой и шлёт во фронтенд событие "fs-changed" со списком изменённых путей.
@@ -206,7 +241,7 @@ fn watch_folder(
     state: State<WatcherState>,
     root_state: State<RootState>,
     root: String,
-) -> Result<(), String> {
+) -> AppResult<()> {
     let root_path = PathBuf::from(&root);
     let watch_root = root_path.clone();
 
@@ -228,14 +263,14 @@ fn watch_folder(
             let _ = app.emit("fs-changed", paths);
         }
     })
-    .map_err(|e| e.to_string())?;
+    .map_err(AppError::internal)?;
 
     debouncer
         .watcher()
         .watch(&root_path, RecursiveMode::Recursive)
-        .map_err(|e| e.to_string())?;
-    *state.0.lock().map_err(|e| e.to_string())? = Some(debouncer);
-    *root_state.0.lock().map_err(|e| e.to_string())? = Some(root_path);
+        .map_err(AppError::internal)?;
+    *state.0.lock().map_err(AppError::internal)? = Some(debouncer);
+    *root_state.0.lock().map_err(AppError::internal)? = Some(root_path);
     Ok(())
 }
 
@@ -261,11 +296,13 @@ fn initial_path() -> Option<String> {
     path_from_args(std::env::args().skip(1), cwd.as_deref())
 }
 
-/// Что лежит по пути: "dir", "markdown" или "other" (для перетаскивания в окно).
+/// Что лежит по пути: "dir", "markdown", "missing" или "other".
 #[tauri::command]
 fn path_kind(path: String) -> &'static str {
     let path = Path::new(&path);
-    if path.is_dir() {
+    if !path.exists() {
+        "missing"
+    } else if path.is_dir() {
         "dir"
     } else if path.is_file() && is_markdown(path) {
         "markdown"
@@ -275,23 +312,23 @@ fn path_kind(path: String) -> &'static str {
 }
 
 /// Проверяет, что путь существует и лежит внутри открытой папки.
-fn ensure_inside_root(state: &RootState, path: &Path, allow_root: bool) -> Result<PathBuf, String> {
+fn ensure_inside_root(state: &RootState, path: &Path, allow_root: bool) -> AppResult<PathBuf> {
     let root = state
         .0
         .lock()
-        .map_err(|e| e.to_string())?
+        .map_err(AppError::internal)?
         .clone()
-        .ok_or("Папка не открыта")?;
-    let root = fs::canonicalize(&root).map_err(|e| format!("Папка недоступна: {e}"))?;
-    let full = fs::canonicalize(path).map_err(|e| format!("Путь недоступен: {e}"))?;
+        .ok_or_else(|| AppError::new("no_root"))?;
+    let root = fs::canonicalize(&root).map_err(|e| AppError::new("root_unavailable").detail(e))?;
+    let full = fs::canonicalize(path).map_err(|e| AppError::new("path_unavailable").detail(e))?;
     if !full.starts_with(&root) || (!allow_root && full == root) {
-        return Err("Операция возможна только внутри открытой папки".into());
+        return Err(AppError::new("outside_root"));
     }
     Ok(PathBuf::from(path))
 }
 
 /// Проверяет имя файла или папки по правилам Windows.
-fn validate_name(name: &str) -> Result<String, String> {
+fn validate_name(name: &str) -> AppResult<String> {
     const FORBIDDEN: &str = "<>:\"/\\|?*";
     const RESERVED: &[&str] = &[
         "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8",
@@ -299,28 +336,24 @@ fn validate_name(name: &str) -> Result<String, String> {
     ];
     let name = name.trim();
     if name.is_empty() || name == "." || name == ".." {
-        return Err("Введите имя".into());
+        return Err(AppError::new("name_empty"));
     }
     if let Some(c) = name.chars().find(|c| FORBIDDEN.contains(*c) || c.is_control()) {
-        return Err(format!("Имя не может содержать символ «{c}»"));
+        return Err(AppError::new("name_char").arg(c.to_string()));
     }
     if name.ends_with('.') {
-        return Err("Имя не может заканчиваться точкой".into());
+        return Err(AppError::new("name_dot"));
     }
     let stem = name.split('.').next().unwrap_or(name).to_ascii_uppercase();
     if RESERVED.contains(&stem.as_str()) {
-        return Err(format!("Имя «{name}» зарезервировано Windows"));
+        return Err(AppError::new("name_reserved").arg(name));
     }
     Ok(name.to_string())
 }
 
-fn already_exists(name: &str) -> String {
-    format!("«{name}» уже существует")
-}
-
 /// Создаёт markdown-файл с заголовком. Существующий файл не перезаписывается.
 #[tauri::command]
-fn create_file(root: State<RootState>, dir: String, name: String) -> Result<String, String> {
+fn create_file(root: State<RootState>, dir: String, name: String) -> AppResult<String> {
     let dir = ensure_inside_root(&root, Path::new(&dir), true)?;
     let mut name = validate_name(&name)?;
     if !is_markdown(Path::new(&name)) {
@@ -331,35 +364,35 @@ fn create_file(root: State<RootState>, dir: String, name: String) -> Result<Stri
         .file_stem()
         .map(|s| s.to_string_lossy().into_owned())
         .unwrap_or_default();
+    let create_failed = |e: std::io::Error| AppError::new("create_failed").arg(&name).detail(e);
 
     let mut file = fs::OpenOptions::new()
         .write(true)
         .create_new(true)
         .open(&path)
         .map_err(|e| match e.kind() {
-            ErrorKind::AlreadyExists => already_exists(&name),
-            _ => format!("Не удалось создать «{name}»: {e}"),
+            ErrorKind::AlreadyExists => AppError::new("exists").arg(&name),
+            _ => create_failed(e),
         })?;
-    file.write_all(format!("# {title}\n\n").as_bytes())
-        .map_err(|e| format!("Не удалось записать «{name}»: {e}"))?;
+    file.write_all(format!("# {title}\n\n").as_bytes()).map_err(create_failed)?;
     Ok(path.to_string_lossy().into_owned())
 }
 
 #[tauri::command]
-fn create_folder(root: State<RootState>, dir: String, name: String) -> Result<String, String> {
+fn create_folder(root: State<RootState>, dir: String, name: String) -> AppResult<String> {
     let dir = ensure_inside_root(&root, Path::new(&dir), true)?;
     let name = validate_name(&name)?;
     let path = dir.join(&name);
     fs::create_dir(&path).map_err(|e| match e.kind() {
-        ErrorKind::AlreadyExists => already_exists(&name),
-        _ => format!("Не удалось создать папку «{name}»: {e}"),
+        ErrorKind::AlreadyExists => AppError::new("exists").arg(&name),
+        _ => AppError::new("create_folder_failed").arg(&name).detail(e),
     })?;
     Ok(path.to_string_lossy().into_owned())
 }
 
 /// Переименовывает файл или папку. У markdown-файла расширение сохраняется, если его не указали.
 #[tauri::command]
-fn rename_path(root: State<RootState>, path: String, new_name: String) -> Result<String, String> {
+fn rename_path(root: State<RootState>, path: String, new_name: String) -> AppResult<String> {
     let path = ensure_inside_root(&root, Path::new(&path), false)?;
     let mut new_name = validate_name(&new_name)?;
     if path.is_file() && is_markdown(&path) && !is_markdown(Path::new(&new_name)) {
@@ -373,17 +406,17 @@ fn rename_path(root: State<RootState>, path: String, new_name: String) -> Result
     // Смена только регистра букв на Windows — тот же файл, это разрешено.
     let same_file = old_name.to_lowercase() == new_name.to_lowercase();
     if target.exists() && !same_file {
-        return Err(already_exists(&new_name));
+        return Err(AppError::new("exists").arg(new_name));
     }
-    fs::rename(&path, &target).map_err(|e| format!("Не удалось переименовать: {e}"))?;
+    fs::rename(&path, &target).map_err(|e| AppError::new("rename_failed").detail(e))?;
     Ok(target.to_string_lossy().into_owned())
 }
 
 /// Удаляет в Корзину, а не насовсем.
 #[tauri::command]
-fn delete_path(root: State<RootState>, path: String) -> Result<(), String> {
+fn delete_path(root: State<RootState>, path: String) -> AppResult<()> {
     let path = ensure_inside_root(&root, Path::new(&path), false)?;
-    trash::delete(&path).map_err(|e| format!("Не удалось удалить в Корзину: {e}"))
+    trash::delete(&path).map_err(|e| AppError::new("trash_failed").detail(e))
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

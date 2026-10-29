@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 
 export type MenuItem = { label: string; onSelect: () => void; danger?: boolean } | "separator";
 
@@ -11,20 +11,8 @@ interface Props {
 
 const MARGIN = 8;
 
-export function ContextMenu({ x, y, items, onClose }: Props) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [position, setPosition] = useState({ left: x, top: y });
-
-  // Не даём меню вылезти за край окна.
-  useLayoutEffect(() => {
-    const rect = ref.current?.getBoundingClientRect();
-    if (!rect) return;
-    setPosition({
-      left: Math.max(MARGIN, Math.min(x, window.innerWidth - rect.width - MARGIN)),
-      top: Math.max(MARGIN, Math.min(y, window.innerHeight - rect.height - MARGIN)),
-    });
-  }, [x, y]);
-
+/** Закрывает всплывающее окно по клику мимо, Esc, смене размера и уходу из окна. */
+export function useDismiss(ref: RefObject<HTMLElement | null>, onClose: () => void) {
   useEffect(() => {
     const onMouseDown = (e: MouseEvent) => {
       if (!ref.current?.contains(e.target as Node)) onClose();
@@ -45,7 +33,24 @@ export function ContextMenu({ x, y, items, onClose }: Props) {
       window.removeEventListener("resize", onClose);
       window.removeEventListener("blur", onClose);
     };
-  }, [onClose]);
+  }, [ref, onClose]);
+}
+
+export function ContextMenu({ x, y, items, onClose }: Props) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState({ left: x, top: y });
+
+  // Не даём меню вылезти за край окна.
+  useLayoutEffect(() => {
+    const rect = ref.current?.getBoundingClientRect();
+    if (!rect) return;
+    setPosition({
+      left: Math.max(MARGIN, Math.min(x, window.innerWidth - rect.width - MARGIN)),
+      top: Math.max(MARGIN, Math.min(y, window.innerHeight - rect.height - MARGIN)),
+    });
+  }, [x, y]);
+
+  useDismiss(ref, onClose);
 
   return (
     <div

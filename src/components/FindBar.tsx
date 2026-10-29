@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type RefObject } from "react";
+import { t } from "../i18n";
 
 interface Props {
   query: string;
@@ -101,19 +102,23 @@ export function FindBar({ query, onQueryChange, onClose, target, contentKey, foc
         value={query}
         onChange={(e) => onQueryChange(e.target.value)}
         onKeyDown={onKeyDown}
-        placeholder="Найти в документе"
+        placeholder={t("find.placeholder")}
         spellCheck={false}
       />
       <span className="find-count">
-        {query ? (ranges.length ? `${index + 1} из ${ranges.length}` : "Нет совпадений") : ""}
+        {query
+          ? ranges.length
+            ? t("find.count", { current: index + 1, total: ranges.length })
+            : t("find.none")
+          : ""}
       </span>
-      <button className="icon-button" onClick={() => step(-1)} title="Предыдущее (Shift+Enter)">
+      <button className="icon-button" onClick={() => step(-1)} title={t("find.previous")}>
         ↑
       </button>
-      <button className="icon-button" onClick={() => step(1)} title="Следующее (Enter)">
+      <button className="icon-button" onClick={() => step(1)} title={t("find.next")}>
         ↓
       </button>
-      <button className="icon-button" onClick={onClose} title="Закрыть (Esc)">
+      <button className="icon-button" onClick={onClose} title={t("find.close")}>
         ✕
       </button>
     </div>

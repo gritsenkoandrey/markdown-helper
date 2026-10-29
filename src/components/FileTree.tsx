@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import type { TreeNode } from "../types";
+import { t } from "../i18n";
 
 /** Что сейчас вводится прямо в дереве: имя нового файла/папки или новое имя при переименовании. */
 export type TreeEdit =
@@ -38,7 +39,7 @@ export function FileTree({ root, actions }: Props) {
         ))}
       </ul>
       {root.children.length === 0 && !actions.edit && (
-        <p className="muted">Папка пуста. Правый клик или «+», чтобы создать документ.</p>
+        <p className="muted">{t("tree.empty")}</p>
       )}
     </div>
   );
@@ -125,7 +126,7 @@ function NewItemInput({ depth, actions }: { depth: number; actions: TreeActions 
       initial=""
       selectStem={false}
       depth={depth}
-      placeholder={actions.edit?.kind === "new-folder" ? "Имя папки" : "Имя документа"}
+      placeholder={actions.edit?.kind === "new-folder" ? t("tree.folderName") : t("tree.documentName")}
       onSubmit={actions.onEditSubmit}
       onCancel={actions.onEditCancel}
     />

@@ -19,6 +19,8 @@ interface Props {
   initialText: string;
   /** Поставить курсор в конец (новый документ — сразу писать под заголовком). */
   cursorAtEnd?: boolean;
+  /** Переводы панели поиска CodeMirror для текущего языка. */
+  phrases: Record<string, string>;
   onChange: (text: string) => void;
 }
 
@@ -52,7 +54,28 @@ const theme = EditorView.theme({
     fontFamily: "inherit",
   },
   ".cm-panels.cm-panels-top": { borderBottom: "1px solid var(--border)" },
-  ".cm-panel.cm-search input, .cm-panel.cm-search button": { fontSize: "13px" },
+  ".cm-panel.cm-search": { padding: "6px 8px" },
+  ".cm-panel.cm-search input, .cm-panel.cm-search button, .cm-panel.cm-search label": { fontSize: "12.5px" },
+  ".cm-panel.cm-search label": { color: "var(--text-muted)" },
+  ".cm-textfield": {
+    color: "var(--text)",
+    backgroundColor: "var(--bg)",
+    border: "1px solid var(--border)",
+    borderRadius: "4px",
+    padding: "3px 6px",
+  },
+  ".cm-textfield:focus": { outline: "none", borderColor: "var(--accent)" },
+  ".cm-button": {
+    color: "var(--text)",
+    backgroundImage: "none",
+    backgroundColor: "var(--bg-hover)",
+    border: "1px solid var(--border)",
+    borderRadius: "4px",
+    padding: "2px 8px",
+  },
+  ".cm-button:hover": { backgroundColor: "var(--bg-active)" },
+  ".cm-button:active": { backgroundImage: "none" },
+  ".cm-panel.cm-search [name=close]": { color: "var(--text-muted)", fontSize: "16px" },
 });
 
 const highlightStyle = HighlightStyle.define([
@@ -76,7 +99,7 @@ const highlightStyle = HighlightStyle.define([
 ]);
 
 export const SourceEditor = forwardRef<SourceEditorHandle, Props>(function SourceEditor(
-  { initialText, cursorAtEnd, onChange },
+  { initialText, cursorAtEnd, phrases, onChange },
   ref,
 ) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -92,6 +115,7 @@ export const SourceEditor = forwardRef<SourceEditorHandle, Props>(function Sourc
         doc: initialText,
         selection: cursorAtEnd ? { anchor: initialText.length } : undefined,
         extensions: [
+          EditorState.phrases.of(phrases),
           history(),
           drawSelection(),
           highlightActiveLine(),

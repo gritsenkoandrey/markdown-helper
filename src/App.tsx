@@ -19,6 +19,9 @@ import { parseFile, serializeFile, type FileFormat } from "./fileFormat";
 import { basename, dirname, isExternalUrl, relativePath, resolvePath } from "./paths";
 import { FileTree, type TreeActions, type TreeEdit } from "./components/FileTree";
 import { ContextMenu, type MenuItem } from "./components/ContextMenu";
+import { FavoritesList } from "./components/FavoritesList";
+import { containsPath, loadFavorites, saveFavorites, toggleFavorite } from "./folders";
+import { codeMirrorPhrases, formatError, getLanguage, LANGUAGES, setLanguage, t, type Lang } from "./i18n";
 import { Outline } from "./components/Outline";
 import { FindBar } from "./components/FindBar";
 import { SearchPanel } from "./components/SearchPanel";
@@ -109,6 +112,9 @@ export default function App() {
   const [treeEdit, setTreeEdit] = useState<TreeEdit | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; items: MenuItem[] } | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [favorites, setFavorites] = useState<string[]>(loadFavorites);
+  const [treeCollapsed, setTreeCollapsed] = useState(false);
+  const [lang, setLang] = useState<Lang>(getLanguage);
 
   const contentRef = useRef<HTMLDivElement>(null);
   const articleRef = useRef<HTMLElement>(null);
@@ -156,9 +162,10 @@ export default function App() {
       setTree(result);
       setError(null);
       saveLastRoot(path);
-      invoke("watch_folder", { root: path }).catch((e) => console.warn("Не удалось следить за папкой:", e));
+      setTreeCollapsed(false);
+      invoke("watch_folder", { root: path }).catch((e) => console.warn("watch_folder failed:", e));
     } catch (e) {
-      setError(String(e));
+      setError(formatError(e));
     }
   }, []);
 
@@ -168,7 +175,7 @@ export default function App() {
     try {
       setTree(await invoke<TreeNode | null>("read_tree", { root: path }));
     } catch (e) {
-      setError(String(e));
+      setError(formatError(e));
     }
   }, []);
 
@@ -205,7 +212,7 @@ export default function App() {
           setFindJumpKey((k) => k + 1);
         }
       } catch (e) {
-        if (request === requestRef.current) setError(String(e));
+        if (request === requestRef.current) setError(formatError(e));
       }
     },
     [applyRender, pushHistory, setDirtyState, switchMode],
@@ -222,7 +229,7 @@ export default function App() {
       setError(null);
       return true;
     } catch (e) {
-      setError(String(e));
+      setError(formatError(e));
       return false;
     }
   }, [setDirtyState]);
@@ -232,12 +239,12 @@ export default function App() {
     const doc = docRef.current;
     if (!dirtyRef.current || !doc) return true;
     const choice = await askDialog({
-      title: "Несохранённые изменения",
-      message: `Сохранить изменения в «${basename(doc.path)}»?`,
+      title: t("dialog.unsavedTitle"),
+      message: t("dialog.unsavedMessage", { name: basename(doc.path) }),
       buttons: [
-        { label: "Отмена", value: "cancel" },
-        { label: "Не сохранять", value: "discard" },
-        { label: "Сохранить", value: "save", primary: true },
+        { label: t("dialog.cancel"), value: "cancel" },
+        { label: t("dialog.dontSave"), value: "discard" },
+        { label: t("dialog.save"), value: "save", primary: true },
       ],
       cancelValue: "cancel",
     });
@@ -334,11 +341,11 @@ export default function App() {
 
     if (dirtyRef.current) {
       const choice = await askDialog({
-        title: "Файл изменён на диске",
-        message: `«${basename(doc.path)}» изменили в другой программе, а у вас есть несохранённые правки.`,
+        title: t("dialog.conflictTitle"),
+        message: t("dialog.conflictMessage", { name: basename(doc.path) }),
         buttons: [
-          { label: "Загрузить с диска", value: "disk" },
-          { label: "Оставить мои правки", value: "mine", primary: true },
+          { label: t("dialog.loadFromDisk"), value: "disk" },
+          { label: t("dialog.keepMine"), value: "mine", primary: true },
         ],
         cancelValue: "mine",
       });
@@ -385,9 +392,13 @@ export default function App() {
   /** Открывает путь снаружи: повторный запуск, перетаскивание в окно, аргумент при старте. */
   const openExternalPath = useCallback(
     async (path: string) => {
-      const kind = await invoke<"dir" | "markdown" | "other">("path_kind", { path });
+      const kind = await invoke<"dir" | "markdown" | "missing" | "other">("path_kind", { path });
+      if (kind === "missing") {
+        setError(t("error.missing", { path }));
+        return;
+      }
       if (kind === "other") {
-        setError(`Открыть можно папку или markdown-файл, а не «${basename(path)}»`);
+        setError(t("error.notOpenable", { name: basename(path) }));
         return;
       }
       const root = rootRef.current;
@@ -447,7 +458,7 @@ export default function App() {
         }
         return null;
       } catch (e) {
-        return String(e);
+        return formatError(e);
       }
     },
     [confirmLeave, enterEdit, openFile, refreshTree, remapPaths, treeEdit],
@@ -456,13 +467,11 @@ export default function App() {
   const deleteNode = useCallback(
     async (node: TreeNode) => {
       const choice = await askDialog({
-        title: "Удалить в Корзину?",
-        message: node.is_dir
-          ? `Папка «${node.name}» со всем содержимым будет перемещена в Корзину.`
-          : `Файл «${node.name}» будет перемещён в Корзину.`,
+        title: t("dialog.deleteTitle"),
+        message: t(node.is_dir ? "dialog.deleteFolder" : "dialog.deleteFile", { name: node.name }),
         buttons: [
-          { label: "Удалить", value: "delete" },
-          { label: "Отмена", value: "cancel", primary: true },
+          { label: t("dialog.delete"), value: "delete" },
+          { label: t("dialog.cancel"), value: "cancel", primary: true },
         ],
         cancelValue: "cancel",
       });
@@ -470,7 +479,7 @@ export default function App() {
       try {
         await invoke("delete_path", { path: node.path });
       } catch (e) {
-        setError(String(e));
+        setError(formatError(e));
         return;
       }
       if (docRef.current && isSameOrInside(docRef.current.path, node.path)) resetDocument();
@@ -483,8 +492,17 @@ export default function App() {
     [askDialog, refreshTree, resetDocument],
   );
 
+  const toggleFavoriteFolder = useCallback((path: string) => {
+    setFavorites((prev) => {
+      const next = toggleFavorite(prev, path);
+      saveFavorites(next);
+      return next;
+    });
+  }, []);
+
   const startCreate = useCallback((kind: "new-file" | "new-folder", dir: string) => {
     setSidebarMode("files");
+    setTreeCollapsed(false);
     setTreeEdit({ kind, dir });
   }, []);
 
@@ -497,20 +515,24 @@ export default function App() {
       const items: MenuItem[] = [];
       if (dir) {
         items.push(
-          { label: "Новый документ", onSelect: () => startCreate("new-file", dir) },
-          { label: "Новая папка", onSelect: () => startCreate("new-folder", dir) },
+          { label: t("menu.newDocument"), onSelect: () => startCreate("new-file", dir) },
+          { label: t("menu.newFolder"), onSelect: () => startCreate("new-folder", dir) },
+          "separator",
+          containsPath(favorites, dir)
+            ? { label: t("menu.removeFavorite"), onSelect: () => toggleFavoriteFolder(dir) }
+            : { label: t("menu.addFavorite"), onSelect: () => toggleFavoriteFolder(dir) },
         );
       }
       if (node) {
         if (items.length) items.push("separator");
         items.push(
-          { label: "Переименовать", onSelect: () => setTreeEdit({ kind: "rename", path: node.path, name: node.name }) },
-          { label: "Удалить в Корзину", danger: true, onSelect: () => deleteNode(node) },
+          { label: t("menu.rename"), onSelect: () => setTreeEdit({ kind: "rename", path: node.path, name: node.name }) },
+          { label: t("menu.delete"), danger: true, onSelect: () => deleteNode(node) },
         );
       }
       setContextMenu({ x: e.clientX, y: e.clientY, items });
     },
-    [deleteNode, startCreate],
+    [deleteNode, favorites, startCreate, toggleFavoriteFolder],
   );
 
   const closeContextMenu = useCallback(() => setContextMenu(null), []);
@@ -666,6 +688,11 @@ export default function App() {
     }
   };
 
+  const changeLanguage = (code: Lang) => {
+    setLanguage(code);
+    setLang(code);
+  };
+
   const showSearch = () => {
     setSidebarMode("search");
     setSearchFocusKey((k) => k + 1);
@@ -724,46 +751,67 @@ export default function App() {
             className={"tab" + (sidebarMode === "files" ? " active" : "")}
             onClick={() => setSidebarMode("files")}
           >
-            Файлы
+            {t("tab.files")}
           </button>
           <button
             className={"tab" + (sidebarMode === "search" ? " active" : "")}
             onClick={showSearch}
             disabled={!root}
-            title="Поиск по папке (Ctrl+Shift+F)"
+            title={t("tab.searchTitle")}
           >
-            Поиск
+            {t("tab.search")}
           </button>
           <span className="spacer" />
           {root && (
             <button
               className="icon-button"
               onClick={() => startCreate("new-file", root)}
-              title="Новый документ (правый клик по папке — создать внутри неё)"
+              title={t("sidebar.newDocument")}
             >
               +
             </button>
           )}
-          <button className="icon-button" onClick={pickFolder} title="Открыть папку">
+          <button className="icon-button" onClick={pickFolder} title={t("sidebar.openFolder")}>
             📂
           </button>
           {root && (
-            <button className="icon-button" onClick={refreshTree} title="Обновить">
+            <button className="icon-button" onClick={refreshTree} title={t("sidebar.refresh")}>
               ⟳
             </button>
           )}
         </div>
 
         <div className="panel-body files" hidden={sidebarMode !== "files"}>
-          {root && (
-            <div className="root-name" title={root}>
-              {basename(root)}
-            </div>
-          )}
-          {tree ? (
+          <FavoritesList
+            favorites={favorites}
+            root={root}
+            onOpen={openExternalPath}
+            onRemove={toggleFavoriteFolder}
+          />
+          <div className="root-row">
+            <button
+              className="root-switch"
+              title={root ?? undefined}
+              disabled={!root}
+              onClick={() => setTreeCollapsed((c) => !c)}
+            >
+              <span className={"chevron" + (treeCollapsed ? "" : " open")}>▸</span>
+              <span className="root-switch-name">{root ? basename(root) : t("sidebar.noFolder")}</span>
+            </button>
+            {root && (
+              <button
+                className={"icon-button star" + (containsPath(favorites, root) ? " on" : "")}
+                onClick={() => toggleFavoriteFolder(root)}
+                title={containsPath(favorites, root) ? t("favorites.remove") : t("favorites.add")}
+              >
+                {containsPath(favorites, root) ? "★" : "☆"}
+              </button>
+            )}
+          </div>
+          {treeCollapsed ? null : tree ? (
             <FileTree key={root} root={tree} actions={treeActions} />
           ) : (
-            <p className="muted">{root ? "В папке нет .md файлов" : "Откройте папку с markdown-файлами"}</p>
+            <p className="muted">{root ? t("sidebar.noMarkdown") : t("sidebar.openPrompt")}</p>
           )}
         </div>
 
@@ -785,7 +833,7 @@ export default function App() {
             className="icon-button"
             onClick={() => goHistory(-1)}
             disabled={history.index <= 0}
-            title="Назад (Alt+←)"
+            title={t("toolbar.back")}
           >
             ←
           </button>
@@ -793,33 +841,33 @@ export default function App() {
             className="icon-button"
             onClick={() => goHistory(1)}
             disabled={history.index >= history.stack.length - 1}
-            title="Вперёд (Alt+→)"
+            title={t("toolbar.forward")}
           >
             →
           </button>
           <span className="breadcrumb" title={currentFile ?? undefined}>
             {currentFile && root ? relativePath(root, currentFile) : ""}
-            {dirty && <span className="dirty-mark" title="Есть несохранённые изменения"> ●</span>}
+            {dirty && <span className="dirty-mark" title={t("toolbar.unsaved")}> ●</span>}
           </span>
           {dirty && (
-            <button className="text-button" onClick={save} title="Сохранить (Ctrl+S)">
-              Сохранить
+            <button className="text-button" onClick={save} title={t("toolbar.saveTitle")}>
+              {t("toolbar.save")}
             </button>
           )}
           {currentFile && (
             <button
               className={"text-button" + (editing ? " active" : "")}
               onClick={toggleMode}
-              title="Переключить режим (Ctrl+E)"
+              title={t("toolbar.toggleTitle")}
             >
-              {editing ? "Просмотр" : "Редактировать"}
+              {editing ? t("toolbar.view") : t("toolbar.edit")}
             </button>
           )}
           <button
             className="icon-button"
             onClick={() => root && setQuickOpen(true)}
             disabled={!root}
-            title="Перейти к файлу (Ctrl+P)"
+            title={t("toolbar.quickOpen")}
           >
             ⌕
           </button>
@@ -827,7 +875,7 @@ export default function App() {
             className="icon-button"
             onClick={showFind}
             disabled={!html || editing}
-            title="Найти в документе (Ctrl+F)"
+            title={t("toolbar.find")}
           >
             🔍
           </button>
@@ -851,6 +899,7 @@ export default function App() {
             ref={editorRef}
             initialText={editorText}
             cursorAtEnd={editorCursorAtEnd}
+            phrases={codeMirrorPhrases[lang]}
             onChange={handleEditorChange}
           />
         )}
@@ -866,17 +915,14 @@ export default function App() {
             />
           ) : (
             <div className="empty">
-              <p>Выберите файл слева</p>
+              <p>{t("empty.selectFile")}</p>
               {!root && (
                 <button className="primary-button" onClick={pickFolder}>
-                  Открыть папку
+                  {t("empty.openFolder")}
                 </button>
               )}
               {root && (
-                <p className="hints">
-                  Ctrl+P — перейти к файлу · Ctrl+Shift+F — поиск по папке · Ctrl+F — поиск в документе · Ctrl+E —
-                  редактирование
-                </p>
+                <p className="hints">{t("empty.hints")}</p>
               )}
             </div>
           )}
@@ -886,7 +932,18 @@ export default function App() {
 
       <aside className="outline-panel">
         <div className="panel-header">
-          <span className="panel-title">Оглавление</span>
+          <span className="panel-title">{t("outline.title")}</span>
+          <div className="lang-switch" title={t("sidebar.language")}>
+            {LANGUAGES.map(({ code, label }) => (
+              <button
+                key={code}
+                className={"lang-option" + (code === lang ? " active" : "")}
+                onClick={() => changeLanguage(code)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
         <div className="panel-body">
           {html && (
@@ -912,7 +969,7 @@ export default function App() {
 
       {dragging && (
         <div className="drop-overlay">
-          <div>Отпустите, чтобы открыть папку или .md файл</div>
+          <div>{t("drop.hint")}</div>
         </div>
       )}
 

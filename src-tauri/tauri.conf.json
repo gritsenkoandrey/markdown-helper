@@ -51,6 +51,14 @@
         "description": "Markdown document",
         "role": "Viewer"
       }
-    ]
+    ],
+    "windows": {
+      "nsis": {
+        "languages": [
+          "English",
+          "Russian"
+        ]
+      }
+    }
   }
 }

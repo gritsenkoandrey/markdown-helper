@@ -1,5 +1,6 @@
 import { useEffect, useState, type RefObject } from "react";
 import type { Heading } from "../types";
+import { t } from "../i18n";
 
 interface Props {
   headings: Heading[];
@@ -37,7 +38,7 @@ export function Outline({ headings, scrollRef, onSelect }: Props) {
   }, [headings, scrollRef, onSelect]);
 
   if (visible.length === 0) {
-    return <p className="muted">Нет заголовков</p>;
+    return <p className="muted">{t("outline.empty")}</p>;
   }
 
   return (

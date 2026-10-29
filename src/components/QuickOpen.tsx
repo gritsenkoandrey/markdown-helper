@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { t } from "../i18n";
 
 export interface QuickOpenItem {
   path: string;
@@ -68,7 +69,7 @@ export function QuickOpen({ items, onOpen, onClose }: Props) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={onKeyDown}
-          placeholder="Перейти к файлу…"
+          placeholder={t("quickOpen.placeholder")}
           spellCheck={false}
         />
         <ul ref={listRef}>
@@ -83,7 +84,7 @@ export function QuickOpen({ items, onOpen, onClose }: Props) {
               </button>
             </li>
           ))}
-          {filtered.length === 0 && <li className="muted">Ничего не найдено</li>}
+          {filtered.length === 0 && <li className="muted">{t("search.nothing")}</li>}
         </ul>
       </div>
     </div>
