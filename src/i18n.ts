@@ -56,6 +56,7 @@ const en = {
   "outline.empty": "No headings",
 
   "drop.hint": "Drop to open a folder or .md file",
+  "resizer.title": "Drag to resize, double-click to reset",
 
   "find.placeholder": "Find in document",
   "find.count": "{current} of {total}",
@@ -159,6 +160,7 @@ const ru: { [K in Key]: Entry } = {
   "outline.empty": "Нет заголовков",
 
   "drop.hint": "Отпустите, чтобы открыть папку или .md файл",
+  "resizer.title": "Потяните, чтобы изменить ширину; двойной клик — по умолчанию",
 
   "find.placeholder": "Найти в документе",
   "find.count": "{current} из {total}",

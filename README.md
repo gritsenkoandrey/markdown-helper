@@ -24,6 +24,7 @@ Built with [Tauri 2](https://tauri.app), React and TypeScript. The installer is 
 - **Favorite folders** above the tree for quick switching between projects.
 - **Single instance:** double-clicking a `.md` file while the app is open shows it in the existing window.
 - **Drag & drop** a folder or `.md` file onto the window.
+- **Resizable side panels:** drag the edge of the file tree or the table of contents; the width is remembered.
 - Light and dark theme that follows Windows settings.
 - **English and Russian interface:** EN / RU switch in the table of contents header.
 
@@ -46,6 +47,8 @@ Built with [Tauri 2](https://tauri.app), React and TypeScript. The installer is 
 Right-click in the tree for a menu: new document, new folder, add to favorites, rename, move to the Recycle Bin.
 
 Favorite folders are listed above the tree; click one to open it. The star next to the current folder's name adds it to favorites or removes it. Clicking the name itself collapses and expands the tree.
+
+Drag the edge of a side panel to resize it, or double-click the edge to restore the default width. With the edge focused (Tab), the arrow keys work too.
 
 ## Development requirements
 
@@ -129,7 +132,7 @@ The app isn't code-signed, so Windows SmartScreen may show a warning: "More info
 
 To update, build a new version and run its installer over the old one.
 
-**Settings** (last opened folder, favorite folders, interface language) are stored in `%LOCALAPPDATA%\com.local.mdreader` and survive reinstallation.
+**Settings** (last opened folder, favorite folders, interface language, panel widths) are stored in `%LOCALAPPDATA%\com.local.mdreader` and survive reinstallation.
 
 ## Project structure
 
@@ -152,6 +155,7 @@ src/                      interface (React + TypeScript)
     ContextMenu.tsx       tree context menu
     FavoritesList.tsx     favorite folders list
     ConfirmDialog.tsx     confirmation dialogs
+    Resizer.tsx           drag handle for resizing side panels
 src-tauri/                Rust side (Tauri)
   src/lib.rs              commands: tree, read/write, search, folder watching,
                           create/rename/delete, single instance

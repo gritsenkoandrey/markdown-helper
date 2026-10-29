@@ -28,6 +28,7 @@ import { SearchPanel } from "./components/SearchPanel";
 import { QuickOpen, type QuickOpenItem } from "./components/QuickOpen";
 import { SourceEditor, type SourceEditorHandle } from "./components/SourceEditor";
 import { ConfirmDialog, type DialogRequest } from "./components/ConfirmDialog";
+import { Resizer } from "./components/Resizer";
 import "./App.css";
 
 const LAST_ROOT_KEY = "md-reader:lastRoot";
@@ -52,6 +53,33 @@ interface OpenDocument {
   path: string;
   format: FileFormat;
   savedText: string;
+}
+
+const PANELS_KEY = "md-reader:panels";
+const DEFAULT_PANELS = { left: 260, right: 240 };
+const PANEL_MIN = { left: 232, right: 160 };
+const PANEL_MAX = { left: 560, right: 480 };
+/** Сколько места всегда оставляем документу при растягивании панелей. */
+const CONTENT_MIN = 320;
+
+type PanelWidths = typeof DEFAULT_PANELS;
+
+function loadPanelWidths(): PanelWidths {
+  try {
+    const value = JSON.parse(localStorage.getItem(PANELS_KEY) ?? "null");
+    if (typeof value?.left === "number" && typeof value?.right === "number") return value;
+  } catch {
+    // Повреждённое значение — берём ширину по умолчанию.
+  }
+  return DEFAULT_PANELS;
+}
+
+function savePanelWidths(widths: PanelWidths) {
+  try {
+    localStorage.setItem(PANELS_KEY, JSON.stringify(widths));
+  } catch {
+    // Не критично: ширина просто не запомнится.
+  }
 }
 
 function loadLastRoot(): string | null {
@@ -115,6 +143,7 @@ export default function App() {
   const [favorites, setFavorites] = useState<string[]>(loadFavorites);
   const [treeCollapsed, setTreeCollapsed] = useState(false);
   const [lang, setLang] = useState<Lang>(getLanguage);
+  const [panels, setPanels] = useState<PanelWidths>(loadPanelWidths);
 
   const contentRef = useRef<HTMLDivElement>(null);
   const articleRef = useRef<HTMLElement>(null);
@@ -663,6 +692,8 @@ export default function App() {
     };
   }, [goHistory, save, toggleMode]);
 
+  useEffect(() => savePanelWidths(panels), [panels]);
+
   useEffect(() => {
     const name = currentFile ? `${dirty ? "● " : ""}${basename(currentFile)} — ` : "";
     document.title = name + "MD Reader";
@@ -744,8 +775,22 @@ export default function App() {
   const editing = mode === "edit";
 
   return (
-    <div className="layout">
+    <div
+      className="layout"
+      style={{
+        // min(..., 40vw): при сужении окна панели не съедают документ целиком.
+        gridTemplateColumns: `min(${panels.left}px, 40vw) minmax(0, 1fr) min(${panels.right}px, 40vw)`,
+      }}
+    >
       <aside className="sidebar">
+        <Resizer
+          side="left"
+          width={panels.left}
+          min={PANEL_MIN.left}
+          max={Math.max(PANEL_MIN.left, Math.min(PANEL_MAX.left, window.innerWidth - panels.right - CONTENT_MIN))}
+          onResize={(left) => setPanels((p) => ({ ...p, left }))}
+          onReset={() => setPanels((p) => ({ ...p, left: DEFAULT_PANELS.left }))}
+        />
         <div className="panel-header">
           <button
             className={"tab" + (sidebarMode === "files" ? " active" : "")}
@@ -931,6 +976,14 @@ export default function App() {
       </main>
 
       <aside className="outline-panel">
+        <Resizer
+          side="right"
+          width={panels.right}
+          min={PANEL_MIN.right}
+          max={Math.max(PANEL_MIN.right, Math.min(PANEL_MAX.right, window.innerWidth - panels.left - CONTENT_MIN))}
+          onResize={(right) => setPanels((p) => ({ ...p, right }))}
+          onReset={() => setPanels((p) => ({ ...p, right: DEFAULT_PANELS.right }))}
+        />
         <div className="panel-header">
           <span className="panel-title">{t("outline.title")}</span>
           <div className="lang-switch" title={t("sidebar.language")}>

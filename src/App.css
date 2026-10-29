@@ -123,8 +123,10 @@ button {
 
 .sidebar,
 .outline-panel {
+  position: relative;
   display: flex;
   flex-direction: column;
+  min-width: 0;
   min-height: 0;
   background: var(--bg-panel);
 }
@@ -141,6 +143,7 @@ button {
   display: flex;
   align-items: center;
   gap: 4px;
+  overflow: hidden;
   height: 40px;
   padding: 0 8px 0 12px;
   border-bottom: 1px solid var(--border);
@@ -948,4 +951,51 @@ button:disabled {
 .lang-option.active {
   color: var(--text);
   background: var(--bg-hover);
+}
+
+/* Растягивание боковых панелей */
+
+.resizer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 6;
+  width: 8px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.resizer.left {
+  right: -4px;
+}
+
+.resizer.right {
+  left: -4px;
+}
+
+.resizer::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 2px;
+  background: transparent;
+  transition: background-color 0.15s;
+}
+
+.resizer:hover::after,
+.resizer:focus-visible::after,
+.resizer:active::after {
+  background: var(--accent);
+}
+
+.resizer:focus {
+  outline: none;
+}
+
+body.resizing,
+body.resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
 }
