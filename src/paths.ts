@@ -14,6 +14,12 @@ export function isAbsolute(path: string): boolean {
   return /^[a-zA-Z]:[\\/]/.test(path) || path.startsWith("\\\\");
 }
 
+/** Путь файла относительно открытой папки (для подписей в интерфейсе). */
+export function relativePath(root: string, path: string): string {
+  const prefix = root.replace(/[\\/]+$/, "") + "\\";
+  return path.toLowerCase().startsWith(prefix.toLowerCase()) ? path.slice(prefix.length) : path;
+}
+
 /** Склеивает базовую папку и относительный путь, раскрывая "." и "..". */
 export function resolvePath(baseDir: string, relative: string): string {
   if (isAbsolute(relative)) return relative.replace(/\//g, "\\");

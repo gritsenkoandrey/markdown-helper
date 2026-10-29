@@ -10,6 +10,8 @@
   --accent: #2f6fdb;
   --error-bg: #fdecec;
   --error-text: #a12222;
+  --find-bg: #ffe58a;
+  --find-current-bg: #ffa94d;
 
   font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
   font-size: 15px;
@@ -30,7 +32,20 @@
     --accent: #6ea2ff;
     --error-bg: #3d2224;
     --error-text: #ffb4b4;
+    --find-bg: #6b5a1e;
+    --find-current-bg: #b5651d;
   }
+
+  .shiki,
+  .shiki span {
+    color: var(--shiki-dark) !important;
+  }
+}
+
+/* Подсветка кода: Shiki кладёт цвета обеих тем в CSS-переменные */
+.shiki,
+.shiki span {
+  color: var(--shiki-light);
 }
 
 * {
@@ -182,9 +197,256 @@ button {
   border-left-color: var(--accent);
 }
 
+/* Вкладки боковой панели */
+
+.tab {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.tab:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.tab.active {
+  color: var(--text);
+  font-weight: 600;
+  background: var(--bg-hover);
+}
+
+.spacer {
+  flex: 1;
+}
+
+button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.icon-button:disabled:hover {
+  background: none;
+}
+
+.root-name {
+  padding: 4px 12px 6px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Поиск по папке */
+
+.search-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.search-input,
+.find-bar input,
+.quick-open input {
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  outline: none;
+}
+
+.search-input:focus,
+.find-bar input:focus,
+.quick-open input:focus {
+  border-color: var(--accent);
+}
+
+.search-input {
+  margin: 0 8px;
+  padding: 6px 8px;
+}
+
+.search-panel .muted {
+  margin: 0;
+}
+
+.search-results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.search-file {
+  padding: 6px 12px 2px;
+  font-size: 12.5px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-match {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  padding: 3px 12px 3px 16px;
+  text-align: left;
+  font-size: 12.5px;
+}
+
+.search-match:hover {
+  background: var(--bg-hover);
+}
+
+.search-line {
+  flex-shrink: 0;
+  min-width: 24px;
+  color: var(--text-muted);
+  text-align: right;
+}
+
+.search-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-text mark {
+  color: inherit;
+  background: var(--find-bg);
+  border-radius: 2px;
+}
+
+/* Панель над документом */
+
+.main {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 40px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.breadcrumb {
+  flex: 1;
+  padding: 0 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.find-bar {
+  position: absolute;
+  top: 48px;
+  right: 24px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-panel);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.find-bar input {
+  width: 220px;
+  padding: 4px 8px;
+}
+
+.find-count {
+  min-width: 90px;
+  padding: 0 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+::highlight(find) {
+  background-color: var(--find-bg);
+}
+
+::highlight(find-current) {
+  background-color: var(--find-current-bg);
+}
+
+/* Быстрый переход к файлу */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 12vh;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.quick-open {
+  display: flex;
+  flex-direction: column;
+  width: min(600px, calc(100% - 32px));
+  max-height: 60vh;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-panel);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+}
+
+.quick-open input {
+  margin: 10px;
+  padding: 8px 10px;
+  font-size: 15px;
+}
+
+.quick-open ul {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 8px;
+  overflow: auto;
+}
+
+.quick-open-row {
+  display: block;
+  width: 100%;
+  padding: 6px 14px;
+  text-align: left;
+  font-size: 13.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-open-row.active {
+  background: var(--bg-active);
+}
+
 /* Область документа */
 
 .content {
+  flex: 1;
   overflow: auto;
   min-width: 0;
 }
@@ -316,4 +578,12 @@ button {
   border: none;
   border-top: 1px solid var(--border);
   margin: 2em 0;
+}
+
+.markdown pre.shiki {
+  background: var(--bg-code) !important;
+}
+
+.hints {
+  font-size: 12.5px;
 }

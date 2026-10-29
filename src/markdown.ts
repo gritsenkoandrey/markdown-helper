@@ -1,10 +1,23 @@
 import MarkdownIt from "markdown-it";
 import DOMPurify from "dompurify";
 import { convertFileSrc } from "@tauri-apps/api/core";
+import type { Highlighter } from "shiki";
 import type { Heading } from "./types";
 import { dirname, isExternalUrl, resolvePath } from "./paths";
+import { highlightCode, prepareHighlighter } from "./highlight";
 
-const md = new MarkdownIt({ html: true, linkify: true });
+// markdown-it вызывает highlight синхронно, поэтому подсветчик готовим заранее.
+let highlighter: Highlighter | null = null;
+
+const md = new MarkdownIt({
+  html: true,
+  linkify: true,
+  highlight: (code, lang) => (highlighter && lang ? highlightCode(highlighter, code, lang.toLowerCase()) : null) ?? "",
+});
+
+function fenceLanguage(info: string): string {
+  return info.trim().split(/\s+/)[0].toLowerCase();
+}
 
 function slugify(text: string): string {
   return text
@@ -20,9 +33,13 @@ export interface RenderResult {
 }
 
 /** Отрисовывает markdown в безопасный HTML и собирает список заголовков. */
-export function renderMarkdown(source: string, filePath: string): RenderResult {
+export async function renderMarkdown(source: string, filePath: string): Promise<RenderResult> {
   const env = {};
   const tokens = md.parse(source, env);
+  const langs = tokens.filter((t) => t.type === "fence").map((t) => fenceLanguage(t.info));
+  if (langs.some(Boolean)) {
+    highlighter = await prepareHighlighter(langs.filter(Boolean));
+  }
   const headings: Heading[] = [];
   const usedIds = new Map<string, number>();
   const baseDir = dirname(filePath);
