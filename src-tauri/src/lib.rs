@@ -100,6 +100,27 @@ async fn read_file(path: String) -> Result<String, String> {
     fs::read_to_string(&path).map_err(|e| format!("Не удалось прочитать {path}: {e}"))
 }
 
+/// Атомарная запись: пишем во временный файл рядом и подменяем им оригинал,
+/// чтобы сбой посреди записи не оставил документ обрезанным.
+#[tauri::command]
+async fn write_file(path: String, content: String) -> Result<(), String> {
+    let target = PathBuf::from(&path);
+    if !is_markdown(&target) {
+        return Err(format!("Можно сохранять только markdown-файлы: {path}"));
+    }
+    let (Some(dir), Some(name)) = (target.parent(), target.file_name()) else {
+        return Err(format!("Некорректный путь: {path}"));
+    };
+    // Имя с точкой в начале: наблюдатель за папкой такие файлы пропускает.
+    let tmp = dir.join(format!(".{}.md-reader-tmp", name.to_string_lossy()));
+
+    fs::write(&tmp, content.as_bytes()).map_err(|e| format!("Не удалось сохранить {path}: {e}"))?;
+    fs::rename(&tmp, &target).map_err(|e| {
+        let _ = fs::remove_file(&tmp);
+        format!("Не удалось сохранить {path}: {e}")
+    })
+}
+
 #[derive(Serialize)]
 struct SearchMatch {
     line: usize,
@@ -221,6 +242,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             read_tree,
             read_file,
+            write_file,
             initial_file,
             search_folder,
             watch_folder

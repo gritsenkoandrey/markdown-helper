@@ -9,4 +9,6 @@ export interface Heading {
   id: string;
   level: number;
   text: string;
+  /** Номер строки в исходнике (с нуля), чтобы в редакторе перейти к заголовку. */
+  line: number;
 }

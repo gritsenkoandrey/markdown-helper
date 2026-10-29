@@ -1,4 +1,4 @@
-import MarkdownIt from "markdown-it";
+import MarkdownIt, { type Token } from "markdown-it";
 import DOMPurify from "dompurify";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import type { Highlighter } from "shiki";
@@ -32,6 +32,30 @@ export interface RenderResult {
   headings: Heading[];
 }
 
+/** Проставляет заголовкам id для якорей и возвращает их список для оглавления. */
+function annotateHeadings(tokens: Token[]): Heading[] {
+  const headings: Heading[] = [];
+  const usedIds = new Map<string, number>();
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i];
+    if (token.type !== "heading_open") continue;
+    const text = tokens[i + 1]?.content ?? "";
+    // Префикс "h-" не даёт id пересечься со свойствами DOM (DOMPurify такие вырезает).
+    let id = "h-" + (slugify(text) || "section");
+    const count = usedIds.get(id) ?? 0;
+    usedIds.set(id, count + 1);
+    if (count > 0) id += `-${count}`;
+    token.attrSet("id", id);
+    headings.push({ id, level: Number(token.tag.slice(1)), text, line: token.map?.[0] ?? 0 });
+  }
+  return headings;
+}
+
+/** Только заголовки, без отрисовки: для оглавления во время редактирования. */
+export function extractHeadings(source: string): Heading[] {
+  return annotateHeadings(md.parse(source, {}));
+}
+
 /** Отрисовывает markdown в безопасный HTML и собирает список заголовков. */
 export async function renderMarkdown(source: string, filePath: string): Promise<RenderResult> {
   const env = {};
@@ -40,32 +64,17 @@ export async function renderMarkdown(source: string, filePath: string): Promise<
   if (langs.some(Boolean)) {
     highlighter = await prepareHighlighter(langs.filter(Boolean));
   }
-  const headings: Heading[] = [];
-  const usedIds = new Map<string, number>();
+  const headings = annotateHeadings(tokens);
   const baseDir = dirname(filePath);
 
-  for (let i = 0; i < tokens.length; i++) {
-    const token = tokens[i];
-
-    if (token.type === "heading_open") {
-      const text = tokens[i + 1]?.content ?? "";
-      // Префикс "h-" не даёт id пересечься со свойствами DOM (DOMPurify такие вырезает).
-      let id = "h-" + (slugify(text) || "section");
-      const count = usedIds.get(id) ?? 0;
-      usedIds.set(id, count + 1);
-      if (count > 0) id += `-${count}`;
-      token.attrSet("id", id);
-      headings.push({ id, level: Number(token.tag.slice(1)), text });
-    }
-
-    // Картинки с относительными путями отдаём через asset-протокол Tauri.
-    if (token.type === "inline" && token.children) {
-      for (const child of token.children) {
-        if (child.type !== "image") continue;
-        const src = child.attrGet("src");
-        if (typeof src === "string" && src && !isExternalUrl(src) && !src.startsWith("data:")) {
-          child.attrSet("src", convertFileSrc(resolvePath(baseDir, decodeURI(src))));
-        }
+  // Картинки с относительными путями отдаём через asset-протокол Tauri.
+  for (const token of tokens) {
+    if (token.type !== "inline" || !token.children) continue;
+    for (const child of token.children) {
+      if (child.type !== "image") continue;
+      const src = child.attrGet("src");
+      if (typeof src === "string" && src && !isExternalUrl(src) && !src.startsWith("data:")) {
+        child.attrSet("src", convertFileSrc(resolvePath(baseDir, decodeURI(src))));
       }
     }
   }
