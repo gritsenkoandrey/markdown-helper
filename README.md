@@ -25,7 +25,7 @@ Built with [Tauri 2](https://tauri.app), React and TypeScript. The installer is 
 - **Single instance:** double-clicking a `.md` file while the app is open shows it in the existing window.
 - **Drag & drop** a folder or `.md` file onto the window.
 - **Resizable side panels:** drag the edge of the file tree or the table of contents; the width is remembered.
-- Light and dark theme that follows Windows settings.
+- **Obsidian-style look:** graphite panels, purple accent, Inter and JetBrains Mono fonts (bundled, no internet needed). Light and dark theme follow Windows settings.
 - **English and Russian interface:** EN / RU switch in the table of contents header.
 
 [Shiki]: https://shiki.style
@@ -161,7 +161,6 @@ src-tauri/                Rust side (Tauri)
                           create/rename/delete, single instance
   tauri.conf.json         window, installer and .md association settings
   capabilities/           permissions for the interface
-samples/                  sample documents
 ```
 
 ## Translations

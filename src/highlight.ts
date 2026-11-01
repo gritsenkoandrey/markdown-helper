@@ -1,9 +1,13 @@
 import { bundledLanguages, createHighlighter, type BundledLanguage, type Highlighter } from "shiki";
 
+// Те же цвета, что и в теме Obsidian по умолчанию.
+const LIGHT_THEME = "one-light";
+const DARK_THEME = "one-dark-pro";
+
 let highlighterPromise: Promise<Highlighter> | null = null;
 
 function getHighlighter(): Promise<Highlighter> {
-  highlighterPromise ??= createHighlighter({ themes: ["github-light", "github-dark"], langs: [] });
+  highlighterPromise ??= createHighlighter({ themes: [LIGHT_THEME, DARK_THEME], langs: [] });
   return highlighterPromise;
 }
 
@@ -27,7 +31,7 @@ export function highlightCode(highlighter: Highlighter, code: string, lang: stri
   if (!highlighter.getLoadedLanguages().includes(lang)) return null;
   return highlighter.codeToHtml(code, {
     lang,
-    themes: { light: "github-light", dark: "github-dark" },
+    themes: { light: LIGHT_THEME, dark: DARK_THEME },
     defaultColor: false,
   });
 }

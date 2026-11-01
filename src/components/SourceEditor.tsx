@@ -1,8 +1,17 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
-import { EditorState } from "@codemirror/state";
-import { EditorView, drawSelection, highlightActiveLine, keymap } from "@codemirror/view";
+import { EditorState, RangeSetBuilder } from "@codemirror/state";
+import {
+  Decoration,
+  EditorView,
+  ViewPlugin,
+  drawSelection,
+  highlightActiveLine,
+  keymap,
+  type DecorationSet,
+  type ViewUpdate,
+} from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
-import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
+import { HighlightStyle, syntaxHighlighting, syntaxTree } from "@codemirror/language";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { languages } from "@codemirror/language-data";
 import { highlightSelectionMatches, search, searchKeymap } from "@codemirror/search";
@@ -28,13 +37,14 @@ interface Props {
 const theme = EditorView.theme({
   "&": {
     height: "100%",
-    fontSize: "14px",
+    fontSize: "15px",
     color: "var(--text)",
     backgroundColor: "var(--bg)",
   },
   "&.cm-focused": { outline: "none" },
   ".cm-scroller": {
-    fontFamily: '"Cascadia Code", Consolas, monospace',
+    // Как в Obsidian: текст набирается обычным шрифтом, код — моноширинным.
+    fontFamily: "var(--font-text)",
     lineHeight: "1.65",
   },
   ".cm-content": {
@@ -42,6 +52,11 @@ const theme = EditorView.theme({
     caretColor: "var(--accent)",
   },
   ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--accent)", borderLeftWidth: "2px" },
+  ".cm-code-line": {
+    fontFamily: "var(--font-mono)",
+    fontSize: "0.9em",
+    backgroundColor: "var(--bg-code)",
+  },
   ".cm-activeLine": { backgroundColor: "color-mix(in srgb, var(--bg-hover) 50%, transparent)" },
   "&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection":
     { backgroundColor: "var(--bg-active)" },
@@ -86,7 +101,7 @@ const highlightStyle = HighlightStyle.define([
   { tag: t.emphasis, fontStyle: "italic" },
   { tag: t.strikethrough, textDecoration: "line-through" },
   { tag: [t.link, t.url], color: "var(--accent)" },
-  { tag: t.monospace, color: "var(--syn-code)" },
+  { tag: t.monospace, color: "var(--syn-code)", fontFamily: "var(--font-mono)" },
   { tag: t.quote, color: "var(--text-muted)" },
   // Служебные символы разметки: #, *, `, >, -, [ ] и т.п.
   { tag: [t.processingInstruction, t.contentSeparator, t.meta], color: "var(--text-muted)" },
@@ -97,6 +112,50 @@ const highlightStyle = HighlightStyle.define([
   { tag: [t.number, t.bool, t.null, t.atom], color: "var(--syn-number)" },
   { tag: [t.function(t.variableName), t.function(t.propertyName), t.typeName, t.className], color: "var(--syn-function)" },
 ]);
+
+const codeLineDecoration = Decoration.line({ class: "cm-code-line" });
+
+/** Строки блоков кода (```), видимые на экране. */
+function codeBlockLines(view: EditorView): DecorationSet {
+  const lineStarts = new Set<number>();
+  const { doc } = view.state;
+  for (const { from, to } of view.visibleRanges) {
+    syntaxTree(view.state).iterate({
+      from,
+      to,
+      enter: (node) => {
+        if (node.name !== "FencedCode" && node.name !== "CodeBlock") return;
+        for (let line = doc.lineAt(node.from); ; line = doc.line(line.number + 1)) {
+          lineStarts.add(line.from);
+          if (line.to >= node.to || line.number === doc.lines) break;
+        }
+        return false;
+      },
+    });
+  }
+  const builder = new RangeSetBuilder<Decoration>();
+  for (const start of [...lineStarts].sort((a, b) => a - b)) builder.add(start, start, codeLineDecoration);
+  return builder.finish();
+}
+
+// Код внутри ``` подсвечивается грамматикой своего языка и теряет «моноширинную» метку markdown,
+// поэтому шрифт и подложку задаём целым строкам.
+const codeBlocks = ViewPlugin.fromClass(
+  class {
+    decorations: DecorationSet;
+
+    constructor(view: EditorView) {
+      this.decorations = codeBlockLines(view);
+    }
+
+    update(update: ViewUpdate) {
+      if (update.docChanged || update.viewportChanged || syntaxTree(update.startState) !== syntaxTree(update.state)) {
+        this.decorations = codeBlockLines(update.view);
+      }
+    }
+  },
+  { decorations: (plugin) => plugin.decorations },
+);
 
 export const SourceEditor = forwardRef<SourceEditorHandle, Props>(function SourceEditor(
   { initialText, cursorAtEnd, phrases, onChange },
@@ -124,6 +183,7 @@ export const SourceEditor = forwardRef<SourceEditorHandle, Props>(function Sourc
           EditorView.lineWrapping,
           markdown({ base: markdownLanguage, codeLanguages: languages }),
           syntaxHighlighting(highlightStyle),
+          codeBlocks,
           theme,
           keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab]),
           EditorView.updateListener.of((update) => {

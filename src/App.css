@@ -1,58 +1,75 @@
+/* Тема в стиле Obsidian: графитовые панели, фиолетовый акцент, Inter. */
 :root {
   --bg: #ffffff;
-  --bg-panel: #f6f7f9;
-  --bg-hover: #e9ecf0;
-  --bg-active: #dde6f5;
-  --bg-code: #f2f4f7;
-  --text: #1f2328;
-  --text-muted: #6b7280;
-  --border: #dfe2e6;
-  --accent: #2f6fdb;
+  --bg-panel: #f6f6f6;
+  --bg-hover: rgba(0, 0, 0, 0.06);
+  --bg-active: rgba(120, 82, 238, 0.12);
+  --bg-code: #f5f5f5;
+  --text: #222222;
+  --text-muted: #5c5c5c;
+  --text-faint: #ababab;
+  --heading: #1a1a1a;
+  --active-text: #1a1a1a;
+  --border: #e3e3e3;
+  --accent: #7852ee;
+  --accent-text: #7852ee;
+  --code-text: #c4522e;
   --error-bg: #fdecec;
-  --error-text: #a12222;
-  --find-bg: #ffe58a;
-  --find-current-bg: #ffa94d;
-  --scrollbar: rgba(0, 0, 0, 0.18);
-  --scrollbar-hover: rgba(0, 0, 0, 0.32);
-  /* Цвета для подсветки markdown в редакторе */
-  --syn-keyword: #cf222e;
-  --syn-string: #0a3069;
-  --syn-comment: #6e7781;
-  --syn-number: #0550ae;
-  --syn-function: #8250df;
-  --syn-code: #953800;
+  --error-text: #b42318;
+  --find-bg: rgba(255, 208, 0, 0.45);
+  --find-current-bg: #ffb86b;
+  --scrollbar: rgba(0, 0, 0, 0.15);
+  --scrollbar-hover: rgba(0, 0, 0, 0.28);
+  /* Цвета для подсветки markdown и кода в редакторе */
+  --syn-keyword: #a626a4;
+  --syn-string: #50a14f;
+  --syn-comment: #a0a1a7;
+  --syn-number: #986801;
+  --syn-function: #4078f2;
+  --syn-code: #c4522e;
+
+  --font-ui: "Inter Variable", "Inter", "Segoe UI", sans-serif;
+  --font-text: "Inter Variable", "Inter", "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", "Cascadia Code", Consolas, monospace;
+  --radius: 4px;
 
   /* Системные элементы (полосы прокрутки, поля ввода) в цвет темы */
   color-scheme: light dark;
-  font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
-  font-size: 15px;
+  font-family: var(--font-ui);
+  font-size: 14px;
   color: var(--text);
   background: var(--bg);
+  -webkit-font-smoothing: antialiased;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #1b1d21;
-    --bg-panel: #22252a;
-    --bg-hover: #2c3036;
-    --bg-active: #2e3a50;
-    --bg-code: #2a2d33;
-    --text: #e3e5e8;
-    --text-muted: #8b919a;
-    --border: #33373d;
-    --accent: #6ea2ff;
+    --bg: #1e1e1e;
+    --bg-panel: #262626;
+    --bg-hover: rgba(255, 255, 255, 0.07);
+    --bg-active: rgba(139, 108, 239, 0.2);
+    --bg-code: #2a2a2a;
+    --text: #dadada;
+    --text-muted: #a3a3a3;
+    --text-faint: #666666;
+    --heading: #e6e6e6;
+    --active-text: #ffffff;
+    --border: #363636;
+    --accent: #8b6cef;
+    --accent-text: #a88bfa;
+    --code-text: #e0a476;
     --error-bg: #3d2224;
-    --error-text: #ffb4b4;
-    --find-bg: #6b5a1e;
-    --find-current-bg: #b5651d;
-    --scrollbar: rgba(255, 255, 255, 0.16);
-    --scrollbar-hover: rgba(255, 255, 255, 0.3);
-    --syn-keyword: #ff7b72;
-    --syn-string: #a5d6ff;
-    --syn-comment: #8b949e;
-    --syn-number: #79c0ff;
-    --syn-function: #d2a8ff;
-    --syn-code: #ffa657;
+    --error-text: #ff9b9b;
+    --find-bg: rgba(255, 208, 0, 0.3);
+    --find-current-bg: rgba(255, 140, 0, 0.65);
+    --scrollbar: rgba(255, 255, 255, 0.12);
+    --scrollbar-hover: rgba(255, 255, 255, 0.24);
+    --syn-keyword: #c678dd;
+    --syn-string: #98c379;
+    --syn-comment: #7f848e;
+    --syn-number: #d19a66;
+    --syn-function: #61afef;
+    --syn-code: #e0a476;
   }
 
   .shiki,
@@ -97,7 +114,7 @@ body {
   background: var(--scrollbar);
   background-clip: content-box;
   border: 2px solid transparent;
-  border-radius: 6px;
+  border-radius: var(--radius);
 }
 
 ::-webkit-scrollbar-thumb:hover {
@@ -171,7 +188,7 @@ button {
 .icon-button {
   width: 28px;
   height: 28px;
-  border-radius: 6px;
+  border-radius: var(--radius);
 }
 
 .icon-button:hover {
@@ -214,6 +231,7 @@ button {
 
 .tree-row.active {
   background: var(--bg-active);
+  color: var(--active-text);
   font-weight: 600;
 }
 
@@ -247,7 +265,7 @@ button {
 .tab {
   height: 28px;
   padding: 0 10px;
-  border-radius: 6px;
+  border-radius: var(--radius);
   font-size: 13px;
   color: var(--text-muted);
 }
@@ -290,7 +308,7 @@ button:disabled {
   min-width: 0;
   height: 26px;
   padding: 0 6px;
-  border-radius: 6px;
+  border-radius: var(--radius);
   font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;
@@ -316,7 +334,7 @@ button:disabled {
 }
 
 .icon-button.star.on {
-  color: #e3a008;
+  color: var(--accent);
 }
 
 /* Поиск по папке */
@@ -335,7 +353,7 @@ button:disabled {
   color: var(--text);
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius);
   outline: none;
 }
 
@@ -486,7 +504,7 @@ button:disabled {
   width: min(600px, calc(100% - 32px));
   max-height: 60vh;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 8px;
   background: var(--bg-panel);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
   overflow: hidden;
@@ -540,7 +558,7 @@ button:disabled {
 
 .primary-button {
   padding: 8px 16px;
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: var(--accent);
   color: #fff;
 }
@@ -548,7 +566,7 @@ button:disabled {
 .error {
   margin: 16px 32px 0;
   padding: 10px 14px;
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: var(--error-bg);
   color: var(--error-text);
 }
@@ -556,10 +574,12 @@ button:disabled {
 /* Отрисованный markdown */
 
 .markdown {
-  max-width: 860px;
+  max-width: 760px;
   margin: 0 auto;
   padding: 32px 40px 80px;
-  line-height: 1.65;
+  font-family: var(--font-text);
+  font-size: 16px;
+  line-height: 1.6;
   overflow-wrap: break-word;
 }
 
@@ -571,19 +591,19 @@ button:disabled {
 .markdown h6 {
   margin: 1.6em 0 0.6em;
   line-height: 1.3;
+  font-weight: 700;
+  color: var(--heading);
   scroll-margin-top: 16px;
 }
 
 .markdown h1 {
   font-size: 2em;
-  padding-bottom: 0.3em;
-  border-bottom: 1px solid var(--border);
+  letter-spacing: -0.015em;
 }
 
 .markdown h2 {
   font-size: 1.5em;
-  padding-bottom: 0.25em;
-  border-bottom: 1px solid var(--border);
+  letter-spacing: -0.01em;
 }
 
 .markdown h3 {
@@ -595,7 +615,7 @@ button:disabled {
 }
 
 .markdown a {
-  color: var(--accent);
+  color: var(--accent-text);
   text-decoration: none;
 }
 
@@ -604,16 +624,17 @@ button:disabled {
 }
 
 .markdown code {
-  font-family: "Cascadia Code", Consolas, monospace;
-  font-size: 0.88em;
+  font-family: var(--font-mono);
+  font-size: 0.86em;
   padding: 0.15em 0.35em;
-  border-radius: 4px;
+  border-radius: var(--radius);
   background: var(--bg-code);
+  color: var(--code-text);
 }
 
 .markdown pre {
   padding: 14px 16px;
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--bg-code);
   overflow: auto;
   line-height: 1.5;
@@ -622,13 +643,14 @@ button:disabled {
 .markdown pre code {
   padding: 0;
   background: none;
+  color: inherit;
 }
 
 .markdown blockquote {
   margin: 1em 0;
   padding: 0 1em;
   color: var(--text-muted);
-  border-left: 4px solid var(--border);
+  border-left: 2px solid var(--accent);
 }
 
 .markdown table {
@@ -675,7 +697,7 @@ button:disabled {
 .text-button {
   height: 28px;
   padding: 0 10px;
-  border-radius: 6px;
+  border-radius: var(--radius);
   font-size: 13px;
   white-space: nowrap;
 }
@@ -707,7 +729,7 @@ button:disabled {
   width: min(440px, calc(100% - 32px));
   padding: 20px 22px 16px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 8px;
   background: var(--bg-panel);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
 }
@@ -731,7 +753,7 @@ button:disabled {
 
 .secondary-button {
   padding: 8px 14px;
-  border-radius: 6px;
+  border-radius: var(--radius);
   border: 1px solid var(--border);
 }
 
@@ -854,8 +876,8 @@ button:disabled {
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-muted);
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
 }
 
 .favorites-empty {
@@ -933,7 +955,7 @@ button:disabled {
   gap: 2px;
   padding: 2px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius);
 }
 
 .lang-option {
